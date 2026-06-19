@@ -34,24 +34,4 @@ Examples pull live data from Brazilian public APIs (Banco Central via `rbcb`, IP
 
 ---
 
-## Supporting data
-
-A few lectures include spreadsheets used directly in the code:
-
-- **Lecture 04:** `Aula_4_estimacao_inflacao_MV.xlsx`, `Aula_4_ibovespa_estimacao.xlsx`, plus an extra script `Aula_4_Ibov_estimacao.Rmd`.
-- **Lecture 06:** `Aula_6_PIB_sazonalidade.xlsx`.
-
----
-
-## Main R packages
-
-| Purpose | Packages |
-|---|---|
-| Data access | `rbcb`, `ipeadatar` |
-| Time series objects | `zoo`, `xts` |
-| Modeling and tests | `forecast`, `urca`, `vars`, `rugarch` |
-| Interactive plots | `dygraphs` |
-
----
-
 > Course materials by Prof. Silvio Costa. Organized and documented for study and reference.
