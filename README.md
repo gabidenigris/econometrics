@@ -13,17 +13,14 @@ Each module pairs the theory (identification, assumptions, estimators) with hand
 econometrics/
 ├── README.md
 ├── cross-section/
-│   ├── README.md
 │   ├── aula1.R
 │   ├── aula2.R
 │   └── aula3.R
 ├── time-series/
-│   ├── README.md
 │   ├── aula1.R
 │   ├── aula2.R
 │   └── aula3.R
 └── panel-data/
-    ├── README.md
     ├── aula1.R
     ├── aula2.R
     └── aula3.R
