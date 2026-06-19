@@ -1,0 +1,163 @@
+---
+title: "Aula 4: Estimação de modelos ARIMA"
+author: "Silvio Costa"
+date: "11/abr/2025"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+format: 
+  html:
+    fig-width: 8
+    fig-height: 4
+    code-fold: true
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Plano
+
+-   Revisar o conceito de máxima verossimilhança (MV)
+-   Entender a diferença entre verossimilhança exata e aproximada
+-   Aplicar o conceito a um modelo AR(1)
+-   Usar **R** para estimar os parâmetros
+
+------------------------------------------------------------------------
+
+## 1. Máxima Verossimilhança: Revisão
+
+Os pacotes estatísticos como o R possibilitam simular e estimar os coeficientes de modelos de séries temporais.
+
+Vamos retomar o conceito de máxima verossimilhança e como aplicá-la nos modelos ARMA(p,q).
+
+Dado um vetor de dados $Y = (y_1, ..., y_T)$ e um vetor de parâmetros $\theta$, a função de verossimilhança é:
+
+$$
+L(\theta|y) = f(y_1, y_2, \dots, y_T \mid \theta)
+$$
+
+A log-verossimilhança é:
+
+$$
+\ell(\theta|y) = \log L( \theta|y)
+$$
+
+Queremos estimar:
+
+$$
+\hat{   \theta}_{MV} = arg \max_\theta \, \ell(\theta)
+$$
+
+Em particular, usamos a distribuição normal como hipótese para a distribuição dos erros dos modelos em séries econômicas e financeiras:
+
+$$
+L(\beta, \sigma^2|y) = \prod_{i=1}^n \frac{1}{\sqrt{2\pi\sigma^2}} \text{exp} \Big[\frac{-(y_i - \beta x_i)^2}{2 \sigma^2} \Big]
+$$
+
+$$
+\ell(\beta, \sigma^2|y) = n . ln \Big[\frac{1}{\sqrt{2\pi\sigma^2}}\Big]  - \frac{1}{2\sigma^2} \sum_{i=1}^n (y_i - \beta x_i)^2
+$$
+
+## 2. Verossimilhança Aproximada (Condicional)
+
+Adaptando ao modelo de séries temporais, a ideia da estimacao é usar as $p$ primeiras observações como valores iniciais para maximizar a função de verossimilhança (condicional):
+
+$$
+\ell(\theta|y) = \frac{T- p}{2} . ln{(2\pi\sigma^2)} - \frac{1}{2\sigma^2} \sum_{i=1}^n (y_t - c - \sum_{i=1}^{p} \phi^i y_{t-i})^2
+$$
+
+Os estimadores são obtidos ao tomar as condições de primeira ordem com relação a $c$, $\phi_i$ e $\sigma^2$ e igualá-las a zero.
+
+A verossimilhança condicional ou aproximada ignora a distribuição das observações iniciais ($y_1$ por exemplo) e considera apenas as distribuições a posteriori:
+
+$$ L_c(\phi, \sigma^2) = \prod_{t=2}^T f(y_t \mid y_{t-1}) $$
+
+**Vantagem:** Mais simples, boa aproximação quando $T$ é grande e é flexível para o caso de séries não estacionárias.
+
+As máximas verossimilhanças condicional e exata têm as mesmas propriedades assintóticas quando o modelo é estacionário (raízes fora do círculo unitário).
+
+A estimação de $\phi_i$ por máxima verossimilhança condicional é equivalente ao método de mínimos quadrados ordinários. No entanto, o estimador da variância não é igual ao de mínimos quadrados.
+
+------------------------------------------------------------------------
+
+## 3. Verossimilhança Exata
+
+Precisamos conhecer a distribuição incondicional do processo $y_t$ e assumir que as primeiras observações ou são determinadas ou seguem a distribuição incondicional.
+
+No caso de um modelo AR(1):$$ y_t = \phi y_{t-1} + \varepsilon_t, \quad \varepsilon_t \sim \mathcal{N}(0, \sigma^2) $$
+
+Para calcular a verossimilhança, precisamos assumir $|\phi| < 1$ (estacionariedade) para definir a distribuição incondicional e assumir que $y_1$ segue a distribuição incondicional.
+
+$$
+y_1 \sim \mathcal{N}(0, \frac{\sigma^2}{1 - \phi^2})
+$$
+
+A função de verossimilhança é:
+
+$$
+L(\phi, \sigma^2) = f(y_1) \prod_{t=2}^T f(y_t \mid y_{t-1})
+$$
+
+**Vantagens:** Estimativa eficiente, porém requer estacionariedade.
+
+------------------------------------------------------------------------
+
+## 4. Comparação dos Métodos
+
+| Critério               | Exata           | Aproximada          |
+|------------------------|-----------------|---------------------|
+| Precisão               | Alta            | Boa se T grande     |
+| Complexidade           | Maior           | Menor               |
+| Exige estacionariedade | Sim             | Não necessariamente |
+| Método no software R   | `method = "ML"` | `method = "CSS"`    |
+
+------------------------------------------------------------------------
+
+## 5. Exemplo no R: simulação de série AR(1)
+
+```{r simular-ar1}
+set.seed(12345)
+T <- 200
+phi <- 0.7
+sigma <- 1
+y <- numeric(T)
+
+# Condição inicial para estacionariedade
+y[1] <- rnorm(1, 0, sqrt(sigma^2 / (1 - phi^2)))
+
+# Gerando a série
+for (t in 2:T) {
+  y[t] <- phi * y[t-1] + rnorm(1, 0, sigma)
+}
+
+ts.plot(y, main = "Série AR(1) Simulada", ylab = "y_t")
+```
+
+------------------------------------------------------------------------
+
+## 6. Estimação do modelo simulado
+
+```{r}
+
+model_approx <- arima(y, order = c(1, 0, 0), method = "CSS", 
+                      include.mean = FALSE, n.cond= 10)
+
+model_exact <- arima(y, order = c(1, 0, 0), method = "ML", 
+                     include.mean = FALSE)
+
+
+```
+
+
+Compare os resultados: estimativas dos coeficientes $\phi$, variâncias, Log-verossimilhança, AIC
+
+```{r comparar}
+
+model_approx
+
+model_exact
+
+```

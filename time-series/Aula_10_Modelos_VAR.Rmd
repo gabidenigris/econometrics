@@ -1,0 +1,473 @@
+---
+title: "Aula 10: Modelos VAR"
+author: "Silvio Costa"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+format: 
+  html:
+    fig-width: 8
+    fig-height: 4
+    code-fold: true
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# Introdução ao Vetor Autoregressivo (VAR)
+
+-   Modelos univariados são limitados!
+
+-   Um VAR permite modelar diversas variáveis simultaneamente.
+
+**Equação Estrutural do VAR:** $$
+AX_t = B_0 + \sum_{i=1}^{p} B_i X_{t-i} + B\epsilon_t
+$$ Onde:
+
+\- $A$: matriz de restrições (mxn)
+
+\- $X_t$: variáveis endógenas (nx1)
+
+\- $B_0$: constantes (nx1)
+
+\- $B_i$: coeficientes (mxn)
+
+\- $B$: matriz diagonal (mxn)
+
+\- $\epsilon_t$: choques (nx1) $\sim IID(0, I_n)$
+
+-   No modelo estrutural, os choques são identificados, cada choque
+    corresponde a uma alteração em sua respectiva variável. Por que isso
+    é importante?
+
+**Equação da Forma Reduzida:**
+
+$$
+\begin{cases}
+X_t = A^{-1}B_0 + \sum_{i=1}^{p} B_i A^{-1} X_{t-i} + A^{-1}B\epsilon_t \\
+X_t = \Phi_0 + \sum_{i=1}^{p} \Phi_i X_{t-i} + e_t
+\end{cases}
+$$
+
+**Exemplo:** $$
+\begin{cases}
+y_t = b_{10} - a_{12}z_t + b_{11}y_{t-1} + b_{12}z_{t-1} + \sigma_y \epsilon_{yt} \\
+z_t = b_{20} - a_{21}y_t + b_{21}y_{t-1} + b_{22}z_{t-1} + \sigma_z \epsilon_{zt}
+\end{cases}
+$$
+
+-   As variáveis $y_t$ e $z_t$ são afetadas umas pelas outras e por suas
+    defasagens. Nesse sentido, há um efeito feedback que atrapalha a
+    estimação.
+
+-   O objetivo do VAR é desenvolver técnicas para resolver esse
+    problema, encontrar a trajetória da variável de interesse para o
+    choque estrutural.
+
+-   Hipóteses do modelo:
+
+    -   $y_t$ e $z_t$ são estacionários
+
+    -   $\epsilon_{yt} \sim RB(0,1)$ e $\epsilon_{zt} \sim RB(0,1)$
+
+    -   $\epsilon_{yt} \perp \epsilon_{zt} \rightarrow COV(\epsilon_{yt} ,\epsilon_{zt}) =0$
+
+-   De forma geral:
+
+    -   **Estacionaridade:** As séries temporais devem ser estacionárias
+        ou transformadas para estacionaridade.
+
+    -   **Linearidade:** A relação entre as variáveis é linear.
+
+    -   **Erro Branco:** Os resíduos devem ser ruído branco, ou seja,
+        não correlacionados e com média zero.
+
+    -   **Normalidade:** Os resíduos devem seguir uma distribuição
+        normal.
+
+-   A Forma Reduzida permite estimar os modelos com erros não
+    correlacionados com os regressores.
+
+-   Ainda haveria correlação contemporânea entre os erros, mas este não
+    é um problema para a estimação do modelo VAR. um problema para
+    estimarmos o VAR.
+
+-   Importante: A questão fundamental na modelagem VAR é se, a partir da
+    forma reduzida, é possível recuperar os parâmetros que definem a
+    forma estrutural.
+
+-   Por que isso é importante? somente por meio de análise de choques
+    estruturais é possível identificar efeitos de políticas econômicas
+    que tenham significado.
+
+-   É possível incluir váriaveis exógenas no modelo VAR:
+
+$$
+X_t = \Phi_0 + \sum_{i=1}^p \Phi_1 X_{t-i} + G Z_t + \epsilon_t
+$$
+
+em que $G$ é uma matriz de coeficientes (n x g) e $Z_t$ é um vetor de
+variáveis exógenas.
+
+## Especificação do Modelo VAR
+
+-   Dificilmente o número de diferenças necessárias para tornar
+    estacionária uma variável do VAR é o mesmo das demais.
+
+-   A regra é utilizar tantas defasagens quantas forem necessárias para
+    obter "ruídos brancos" em todas as variáveis endógenas.
+
+-   Bom senso e parcimônia devem ser utilizados nesse processo.
+
+-   Temos dois caminhos possíveis:
+
+    1.  Testes partindo de uma ordem $p_{max}$ até rejeitar a hipótese
+        nula
+
+    2.  Comparar os critérios de informação de diferentes especificações
+
+-   Na prática, usamos o segundo caminho, usando as versões
+    multivariadas do AIC, BIC e HQ que seguem a estrutura:
+
+$$
+Crit(m) = \ln|\hat{\Gamma}_0| + c_\tau \phi_m
+$$
+
+em que:
+
+$$
+\hat{\Gamma}_0 = \frac{1}{T} \sum_{t=1}^{T} \hat{e}_t \hat{e}_t'
+$$
+
+-   $c_\tau$ é uma sequência que depende do tamanho da amostra
+
+-   $\phi_m$ é uma função que penaliza VAR de grandes ordens
+
+-   Lütkepohl e Krätzig (2004) mostram que:
+
+$$
+\hat{p}(BIC) \leq \hat{p}(HQ) \leq \hat{p}(AIC)
+$$
+
+-   Na prática, poucos lags não geram resíduos ruído-branco e muitos
+    lags aumentam a variância dos coeficientes, tornando o modelo
+    ineficiente.
+
+## Teste de Hipóteses no VAR
+
+-   A ideia é similar ao de modelos univariados. Ao invés de calcular a
+    soma dos quadrados dos resíduos, agora usa-se o determinante da
+    matriz de covariância dos resíduos do modelo restrito e do modelo
+    irrestrito.
+
+-   Partindo da forma reduzida com variáveis exógenas:
+
+$$
+X_t = \Phi_0 + \sum_{i=1}^p \Phi_1 X_{t-i} + G Z_t + \epsilon_t
+$$
+
+-   Podemos testar:
+
+    -   **Modelo restrito**: com menos parâmetros (ou restrições nos
+        coeficientes).
+
+    -   **Modelo irrestrito**: mais geral, com mais flexibilidade.
+
+$$
+\text{LR} = 2 \left( \ln L_{\text{irrestrito}} - \ln L_{\text{restrito}} \right)
+$$ Onde:
+
+\- $L_{\text{irrestrito}}$: verossimilhança do modelo irrestrito
+
+\- $L_{\text{restrito}}$: verossimilhança do modelo restrito
+
+-   O procedimento consiste em estimar ambos os modelos e calcular a
+    razão de verossimilhança (LR).
+
+    -   Se LR for grande, as restrições prejudicam muito o ajuste. Logo,
+        rejeita-se a $H_0$: restrições não são compatíveis com os dados.
+
+    -   Se LR for pequeno, as restrições são razoáveis. Assim, não se
+        rejeita $H_0$: modelo restrito é aceitável.
+
+## **Estacionaridade**
+
+-   No mundo multivariado, continuaremos a analisar a estacionaridade
+    das séries de tempo.
+
+-   O procedimento padrão consiste em verificar se os autovalores do
+    sistema estão **dentro do círculo unitário**.
+
+-   Se houver variáveis não estacionárias, teremos que transformar o
+    modelo de forma que os coeficientes sejam multiplicados por
+    variáveis estacionárias.
+
+-   IMPORTANTE: em um modelo multivariado com variáveis não
+    estacionárias, inferências sobre hipóteses conjuntas só poderão ser
+    feitas se o modelo puder ser representado de tal forma que os
+    coeficientes a serem testados passem a multiplicar variáveis
+    estacionárias.
+
+-   Suponha que $y_t \sim I(1)$ e $z_t \sim I(1)$. Assuma um VAR(2) para
+    essas variáveis e pegue a primeira equação que corresponde a $y_t$:
+
+$$
+y_t = \phi_{11,1} y_{t-1} + \phi_{12,1} z_{t-1} + \phi_{11,2} y_{t-2} + \phi_{12,2} z_{t-2} + e_{yt}
+$$
+
+-   A estratégia é adicionar e subtrair termos para transformar: $$
+    y_t = (\phi_{11,1} + \phi_{11,2}) y_{t-1} + (\phi_{12,1} + \phi_{12,2}) z_{t-1} - \phi_{11,2} \Delta y_{t-1} - \phi_{12,2} \Delta z_{t-1} + e_{yt}
+    $$
+
+-   Repare que $\Delta y_{t-1}$ e $\Delta z_{t-1}$ são estacionários.
+    Logo, é possível fazer inferência sobre os coeficientes
+    $\phi_{11,2}$ e $\phi_{12,2}$
+
+## Diagnóstico dos Resíduos
+
+**Teste Ljung-Box:**
+
+-   Mesma lógica do caso univariado, testamos a autocorrelação amostral:
+
+-   H0:
+    $E(\epsilon_t \epsilon_{t-j}) = 0, \forall j = 1,2,\ldots, J \quad e \quad J>p$
+
+-   Estatística do teste:
+
+$$
+Q = T \sum_{j=1}^{J} \text{tr}(\hat{\Gamma}_j \hat{\Gamma}_0^{-1} \hat{\Gamma}_j \hat{\Gamma}_0^{-1}) \sim \chi^2_{n^2(J-p)}
+$$
+
+**Teste Breusch-Godfrey:**
+
+-   Testa a autocorrelação dos resíduos do modelo:
+
+$$
+\hat{e}_t = \Theta_1 \hat{e}_{t-1} + \Theta_2 \hat{e}_{t-2} + \ldots + \Theta_h \hat{e}_{t-h} + u_t
+$$
+
+-   H0: $\Theta_1 = \Theta_2 = \ldots = \Theta_h = 0$
+
+**Teste Normalidade (Jarque-Bera para o caso multivariado):**
+
+-   Testa assimetria e curtose dos resíduos compatíveis com uma
+    distribuição normal multivariada.
+
+## Previsão com VAR
+
+**Equação de Previsão:** $$
+E(X_{t+h} | I_t) = X_{t+h} = \Phi_1 X_{t+h-1} + \Phi_2 X_{t+h-2} + \ldots + \Phi_p X_{t+h-p}
+$$
+
+-   **Nota:** Se o processo for estacionário, a incerteza sobre a
+    previsão é limitada.
+
+-   Erros de previsão mais distantes têm limite bem definido.
+
+-   Na presença de variáveis exógenas, o procedimento é projetar a
+    evolução dessas variáveis e realizar a previsão do VAR condicional a
+    essa projeção.
+
+------------------------------------------------------------------------
+
+## Exemplo prático no R:
+
+Primeiro vamos montar nossa base de dados com inflação, atividade e
+juros.
+
+```{r}
+#install.packages("vars")
+library(rbcb)
+library(tseries)    
+library(ggplot2)    
+library(vars)       
+
+ipca_table = get_series(433, start_date = '2000-01-01')
+ipcats = ts( ipca_table$`433`, start = c( 2000, 1 ), frequency = 12 )     # IPCA
+
+ibc_table <- get_series(24364, start_date = '2003-01-01')
+idxibcts <- ts(ibc_table$`24364`, start = c(2003, 1), frequency = 12)     # IBC-BR
+
+ibcts <- diff(log(idxibcts))
+
+selic_table <- get_series(4189, start_date = '2000-01-01')
+selicts <- ts(selic_table$`4189`, start = c(2000, 1), frequency = 12)     # Selic
+
+
+# Plotando cada série temporal individualmente
+par(mfrow = c(1,3)) # Configura a área de plotagem para 1 linha e 3 colunas
+
+plot(ipcats, main = "IPCA", col = "blue", lwd = 2)
+plot(ibcts, main = "IBC", col = "red", lwd = 2)
+plot(selicts, main = "Selic", col = "green", lwd = 2)
+
+dbvar <- ts.intersect( ipcats, ibcts, selicts)
+
+dbvar <- ts(dbvar, start = start(dbvar), frequency = 12)
+
+
+```
+
+Agora vamos selecionar a ordem do VAR a partir de critérios de
+informação:
+
+```{r}
+
+# Selecionando a ordem do modelo VAR
+var_order <- VARselect(dbvar, lag.max = 10, type = "const")
+print(var_order)
+
+```
+
++----------------------------------------------------------------------+
+| Um modelo bem ajustado aos dados significa:                          |
++======================================================================+
+| 1.  Parâmetros estimados são estatisticamente significantes (só vale |
+|     a pena aumentar a ordem do modelo para melhorar o ajuste se os   |
+|     parâmetros acrescentados forem significantes! caso contrário,    |
+|     melhor escolher um modelo mais parcimonioso)                     |
+|                                                                      |
+| 2.  Resíduos não devem apresentar autocorrelação serial, correlação  |
+|     cruzada ou heterocedasticidade condicional.                      |
+|                                                                      |
+| 3.  O modelo é estável ou estacionário (média incondicional do VAR   |
+|     existe). Para isso, verificamos os autovalores associados à      |
+|     matriz conjunta dos coeficientes defasados (de maneira similar   |
+|     ao caso univariado). Queremos que todos os autovalores (raízes)  |
+|     sejam menores do que 1.                                          |
+|                                                                      |
+|     -   Não confunda a estacionariedade do modelo com a              |
+|         estacionariedade individual das séries!                      |
+|                                                                      |
+| 4.  Resíduos não violam a hipótese de distribuição Normal.           |
++----------------------------------------------------------------------+
+
+-   **Sempre teste vários modelos VAR com ordens diferentes,
+    eventualmente imponha restrições nos lags ou acrescente variáveis
+    exógenas. O objetivo é obter resíduos que se pareçam com um ruído
+    branco.**
+
+Escolhida uma ordem para o VAR, vamos estimar os coeficientes:
+
+```{r}
+
+#minha_selecao = var_order$selection["AIC(n)"]
+minha_selecao = 5;
+# o modelo com 5 lags e 3 variáveis tem 15 raízes. 
+# são estimados 18 coeficientes (15 dos lags + 3 interceptos)
+# é um modelo complexo que, como veremos, falhará na hipótese de resíduos normalmente distribuídos
+# na prática, queremos o melhor ajuste possível com o modelo mais parcimonioso (menor ordem)
+
+# Estimando o modelo VAR
+var_model <- VAR(dbvar, p = minha_selecao, type = "const")
+summary(var_model)
+
+```
+
+Outra forma de apresentar os resultados no R é usando o pacote
+stargazer:
+
+```{r}
+library(stargazer)
+
+stargazer::stargazer( var_model$varresult, type = "text", style = "aer", title = "Meu primeiro VAR", column.labels = c( "Inflação", "Atividade", "Juros" ) )
+```
+
+Avaliando os resíduos do VAR:
+
+```{r}
+# Plotando as séries individuais dos resíduos
+resids = residuals(var_model)
+resids = ts(resids, start=start(dbvar), frequency = 12)
+
+par(mfrow = c(1, ncol(resids))) # Configura o layout para múltiplos gráficos
+
+for (i in 1:ncol(resids)) {
+plot.ts(resids[, i], main = paste("Resíduo da Série", colnames(resids)[i]))
+}
+
+```
+
+Diagnóstico dos Resíduos: o que significam esses resultados?
+
+```{r}
+# Ljung-Box test, also known as a portmanteau test
+serial.test(var_model, lags.pt = 16, type = "PT.asymptotic")
+
+# Breusch-Godfrey test
+serial.test(var_model, lags.bg = 10, type = "BG")
+
+# Jarque-Bera
+normality.test(var_model,multivariate.only = TRUE)
+
+# Heteroscedasticidade
+arch_test <- arch.test( var_model, lags.multi = 12, multivariate.only = TRUE)
+print(arch_test)
+
+
+```
+
+Agora calculamos os autovalores do polinômio característico (repare que
+as raízes também são mostradas automaticamente no resultado de estimação
+VAR() acima)
+
+```{r}
+# Autovalores do VAR
+eigenvalues <- roots(var_model)
+print(eigenvalues)
+
+
+```
+
+Mas aqui queremos mostrar graficamente as raízes e o círculo unitário:
+
+```{r}
+
+# Plotar o círculo unitário
+plot(0, 0, type = "n", xlab = "Parte Real", ylab = "Parte Imaginária",
+     xlim = c(-1.5, 1.5), ylim = c(-1.5, 1.5), asp = 1)
+symbols(0, 0, circles = 1, inches = FALSE, add = TRUE)
+
+# Plotar as raízes
+points(Re(eigenvalues), Im(eigenvalues), col = "red", pch = 19)
+
+# Adicionar título
+title("Raízes do Polinômio Característico no Círculo Unitário")
+
+```
+
+O VAR é estacionário. Outro testes de estabilidade pode verificar o que
+acontece com o modelo quando choques aleatórios são simulados:
+
+```{r}
+
+#For details, please refer to documentation efp.
+stability_test <- stability( var_model, type = "OLS-CUSUM", dynamic = TRUE) # Ploberger and Krämer (1992)
+plot(stability_test)
+
+```
+
+Podemos testar quebra estrutural nos parâmetros:
+
+```{r}
+
+# Teste de quebra estrutural
+strucchange::sctest( var_model )
+```
+
+Agora podemos fazer uma previsão com o modelo VAR escolhido:
+
+```{r}
+# Previsão com o modelo VAR
+forecast <- predict(var_model, n.ahead = 12, ci= 0.95)
+
+plot(forecast)
+```
+
+Valores previstos:
+
+```{r}
+print(forecast)
+```

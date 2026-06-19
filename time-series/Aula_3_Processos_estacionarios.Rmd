@@ -1,0 +1,406 @@
+---
+title: "Aula 3: Processos estacionários"
+author: "Silvio Costa"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+format: 
+  html:
+    fig-width: 8
+    fig-height: 4
+    code-fold: true
+---
+
+# Plano
+
+1.  Modelos MA
+
+2.  Modelos AR
+
+3.  Modelos ARMA
+
+------------------------------------------------------------------------
+
+# (1) Modelos MA (Moving Average)
+
+-   **Modelos MA (Médias Móveis)**: Valor atual depende de erros passados. Fórmula:
+
+$$ MA(q): \quad X_t = \epsilon_t + \theta_1 \epsilon_{t-1} + \theta_2 \epsilon_{t-2} + \ldots + \theta_q \epsilon_{t-q}$$
+
+### Modelo MA(1)
+
+A versão mais simples é um modelo MA de ordem 1. Temos:
+
+$$y_t = \mu + \epsilon_t + \theta \epsilon_{t-1}$$com $\epsilon_t \sim RB(0, \sigma^2)$.
+
+-   Como o ruído branco é estacionário, os modelos MA são também estacionários (combinação de ruídos brancos)
+
+-   Esperança:
+
+$$
+E(y_t) = \mu + E(\epsilon_t) + \theta E(\epsilon_{t-1}) = \mu
+$$
+
+-   Variância:
+
+$$
+\begin{eqnarray*}
+var(y_t) &=& E(y_t - \mu)^2\\
+&=& E(\epsilon_t + \theta \epsilon_{t-1})^2\\
+&=& E(\epsilon_t^2 + 2 \theta \epsilon_t \epsilon_{t-1} + \theta^2 \epsilon_{t-1}^2)\\
+&=& E(\epsilon_t^2) + E(2 \theta \epsilon_t \epsilon_{t-1}) + E(\theta^2 \epsilon_{t-1}^2)\\
+&=& \sigma^2 + 0 + \theta^2 \sigma^2\\
+&=& (1 + \theta^2) \sigma^2\\
+\end{eqnarray*}
+
+$$
+
+-   Autocovariância:
+
+$$
+
+\begin{eqnarray*}
+ E[(y_t - \mu)(y_{t-1} - \mu)] &=& E[(\epsilon_t + \theta \epsilon_{t-1})(\epsilon_{t-1} + \theta \epsilon_{t-2})]\\
+&=& E[\epsilon_t \epsilon_{t-1} + \theta \epsilon_t \epsilon_{t-2} + \theta \epsilon_{t-1}^2 + \theta^2 \epsilon_{t-1}\epsilon_{t-2}] \\
+\gamma_1&=& \theta \sigma^2
+\end{eqnarray*}
+$$
+
+------------------------------------------------------------------------
+
+Exercício: crie um modelo MA(1) e calcule as suas funções ACF e PACF. Faça o teste de Ljung-Box e explique os resultados.
+
+```{r}
+# Definindo o coeficiente MA e o número de observações
+ma_coef <- 0.8
+n <- 1000
+
+# Gerando ruído branco
+#set.seed(1234)
+ruido_branco <- rnorm(n)
+
+# Inicializando o vetor do processo MA(1)
+ma_process <- numeric(n)
+
+# Calculando os valores do processo MA(1) em um loop
+for (t in 2:n) {
+  ma_process[t] <- ruido_branco[t] + ma_coef * ruido_branco[t-1]
+}
+
+# Visualizando MA(1)
+plot(ma_process, type = "l", main = "Processo MA(1)", ylab = "Valores", xlab = "Tempo", col="blue")
+```
+
+funções:
+
+```{r}
+par(mfrow=c(1,2))
+
+vacf = acf(ma_process, lag.max = 12, main="ACF")
+
+vpacf = pacf(ma_process, lag.max =12, main="PACF")
+```
+
+```{r}
+teste_lb_ma_process <- Box.test(ma_process, lag = 12, type = "Ljung-Box")
+print(teste_lb_ma_process)
+```
+
+-   Podemos generalizar os modelos de médias móveis pela seguinte equação:
+
+$$
+MA(q) : y_t = \mu + \sum_{j=0}^q \theta_j \epsilon_{t-j}, \quad \theta_0 = 1
+$$
+
+-   A partir da defasagem $q$, a autocorreção desaparece, o que permite identificar a ordem do processo MA.
+
+------------------------------------------------------------------------
+
+### Exercício: Seja um MA(2), calcule $E[y_t]$, $var[y_t]$ e as autocovariâncias e autocorrelações.
+
+------------------------------------------------------------------------
+
+# (2) Modelos AR (Auto Regressive)
+
+-   **Modelos AR (Auto-Regressivos)**: Valor atual depende de valores passados. Fórmula:
+
+$$ AR(p): \quad X_t = \phi_1 X_{t-1} + \phi_2 X_{t-2} + \ldots + \phi_p X_{t-p} + \epsilon_t $$
+
+-   Os processos auto-regressivos (AR) são compostos por uma variável dependente $X_t$ e um termo de erro que é um ruído branco $\epsilon_t$.
+
+### Modelo AR(1)
+
+A versão mais simples é o modelo de ordem 1. Temos:
+
+$$y_t = c + \phi y_{t-1} + \epsilon_t, \quad \epsilon_t \sim RB(0, \sigma^2)$$
+
+-   Sob que condições o modelo AR(1) é estacionário?
+-   Assumimos $|\phi| < 1$ como condição de estabilidade. Por que?
+-   Para verificar as condições de estabilidade, é mais fácil manipular o modelo AR mediante substituições recursivas para incluir termos de ruído branco, os quais conhecemos as propriedades. Então:
+
+$$ 
+
+\begin{eqnarray*}
+(1 - \phi L) y_t &=& c + \epsilon_t\\
+y_t &=& \frac{c}{1-\phi} +  \sum_{j=0}^\infty \phi^j \epsilon_{t-j}
+\end{eqnarray*}
+$$
+
+-   Logo, assumindo estabilidade, o modelo AR(1) pode ser escrito como um modelo MA($\infty$)
+-   Esperança:
+
+$$ E(y_t) = \frac{c}{1-\phi} = \mu $$
+
+-   Variância:
+
+$$ 
+
+\begin{eqnarray*} 
+var(y_t) &=& E(y_t - \mu)^2\\ &=& E\Big(\sum_{j=0}^\infty \phi^j \epsilon_{t-j}\Big)^2\\ &=& E\Big(\sum_{j=0}^\infty \phi^{2j} \epsilon_{t-j}^2\Big)\\ &=& E(\epsilon_t^2) +  \phi^2 E(\epsilon_{t-1}^2) + \phi^4 E(\epsilon_{t-2})^2 + \ldots\\ &=& \sigma^2 + \phi^2 \sigma^2 + \phi^4 \sigma^2 + ....\\ &=& \frac{\sigma^2}{1-\phi^2} 
+\end{eqnarray*} 
+$$
+
+-   Autocovariância:
+
+$$ 
+
+\begin{eqnarray*}  
+E[(y_t - \mu)(y_{t-j} - \mu)] &=& E\Big[\Big(\sum_{s=0}^\infty \phi^s \epsilon_{t-s}\Big)\Big(\sum_{s=0}^\infty \phi^s \epsilon_{t-s-j}\Big)\Big]\\ &=& \phi^j \sigma^2 + \phi^{j+2} \sigma^2 + \phi^{j+4} \sigma^2 + ....\\  &=& \sigma^2 ( \phi^j + \phi^{j+2} + \phi^{j+4} + ....)\\ \gamma_j&=& \Big( \frac{\phi^j}{1 - \phi^2}\Big) \sigma^2  
+\end{eqnarray*} 
+$$
+
+-   Autocorrelações: $$\rho_j  = \phi^j$$.
+
+-   Média, variância e autocovariâncias não são funções do tempo, então o processo é fracamente estacionário!
+
+### Modelo AR(2)
+
+$$y_t = c + \phi_1 y_{t-1} + \phi_2 y_{t-2} + \epsilon_t, \quad \epsilon_t \sim RB(0, \sigma^2)$$
+
+-   Esperança:
+
+$$ 
+
+\begin{eqnarray*}
+E(y_t) &=& c + \phi_1 E(y_{t-1}) + \phi_2 E(y_{t-2}) + E(\epsilon_t) \\
+&=&\frac{c}{1-\phi_1- \phi_2} = \mu 
+\end{eqnarray*}
+$$
+
+-   Parece haver uma regularidade quando comparado ao AR(1)
+
+-   Vamos generalizar a expressão, centrando o AR(2) na média $\mu$ e tomar a esperança:
+
+    $$(y_t -\mu) =  \phi_1 (y_{t-1}-\mu) + \phi_2 (y_{t-2}-\mu) + \epsilon_t$$
+
+-   As autocovariâncias são dadas por:
+
+$$ 
+
+\begin{eqnarray*}  
+E[(y_t - \mu)(y_{t-j} - \mu)] &=& \phi_1 E[(y_{t-1}-\mu)(y_{t-j} - \mu)] + \phi_2 E[(y_{t-2}-\mu)(y_{t-j} - \mu)] \\  \gamma_j&=& \phi_1 \gamma_{j-1} + \phi_2 \gamma_{j-2} \quad j = 1,2,3 \ldots 
+
+\end{eqnarray*} 
+$$
+
+-   Logo, as autocovariâncias e autocorrelações seguem um processo autorregressivo de ordem 2:
+
+$$ 
+\begin{eqnarray*} 
+\gamma_j&=& \phi_1 \gamma_{j-1} + \phi_2 \gamma_{j-2} \\ \rho_j&=& \phi_1 \rho_{j-1} + \phi_2 \rho_{j-2}
+\end{eqnarray*} 
+$$
+
+-   Essas equações são conhecidas como "equações de Yule-Walker". São interessantes pois permitem verificar a função de autocorrelação do processo.
+
+-   A generalização do AR para ordem p é dada por:
+
+$$
+y_t = c + \sum_{j=1}^p \phi_j y_{t-j} + \epsilon_t
+$$
+
+-   Utilizando o operador defasagem podemos escrever
+
+$$ 
+\begin{eqnarray*}
+(1 - \phi_1 L - \phi_2 L^2 - \ldots - \phi_p L^p) y_t &=& c + \epsilon_t
+\end{eqnarray*}
+$$
+
+-   Se o termo entre parênteses for inversível, podemos escrever o modelo AR(p) como um modelo MA($\infty$). Isso será verdade se as raízes da equação $(1 - \phi_1 z - \phi_2 z^2 - \ldots - \phi_p z^p) > 0$, ou seja, se as raízes estiverem fora do círculo unitário.
+
+------------------------------------------------------------------------
+
+**Exemplo: como simular um modelo AR(p)**
+
+```{r}
+
+# Definir os coeficientes do modelo AR(p)
+p <- 2
+ar_coef <- c(1.3, -0.5)  # Coeficientes AR
+
+# Número de observações
+n <- 100
+
+# Simular a série temporal AR(p)
+set.seed(123)  # Para reprodutibilidade
+ar2_sim <- arima.sim(model = list(ar = ar_coef), n = n)
+
+plot(ar2_sim, main = "Série Temporal Simulada AR(2)")
+```
+
+```{r}
+par(mfrow=c(1,2))
+
+vacf = acf(ar2_sim, lag.max = 12, main="ACF")
+
+vpacf = pacf(ar2_sim, lag.max = 12 , main="PACF")
+```
+
+------------------------------------------------------------------------
+
+**Exemplo: como verificar se um modelo AR ajustado aos dados é estável?**
+
+```{r}
+
+# Exemplo de dados
+dados <- c(1.2, 2.4, 3.1, 4.5, 5.7, 6.8, 7.9, 8.3, 9.1, 10.5)
+
+# Ajustar um modelo AR(p) com ordem p = 2
+modelo_ar <- arima(dados, order = c(2, 0, 0))
+
+# Obter os coeficientes do modelo
+coeficientes <- coef(modelo_ar)
+print(coeficientes)
+
+# Calcular as raízes do polinômio característico
+polinomio <- c(1, -coeficientes[1:2])
+raizes <- polyroot(polinomio)
+
+print(raizes)
+
+# Plotar o círculo unitário
+plot(0, 0, type = "n", xlab = "Parte Real", ylab = "Parte Imaginária",
+     xlim = c(-1.5, 1.5), ylim = c(-1.5, 1.5), asp = 1)
+symbols(0, 0, circles = 1, inches = FALSE, add = TRUE)
+
+# Plotar as raízes
+points(Re(raizes), Im(raizes), col = "red", pch = 19)
+
+# Adicionar título
+title("Raízes do Polinômio Característico no Círculo Unitário")
+
+
+# Verificar se as raízes estão fora do círculo unitário
+estabilidade <- all(Mod(raizes) > 1)
+print(estabilidade)
+```
+
+------------------------------------------------------------------------
+
+# (3) Modelos ARMA
+
+Combinando as expressões de AR(p) e MA(q) temos: 
+
+$$
+y_t = c + \sum_{i=1}^p \phi_i y_{t-i} + \sum_{j=0}^q \theta_j \epsilon_{t-j}
+$$
+
+-   Esperança:
+
+$$ 
+E(y_t) = \frac{c}{1- \sum_{i=1}^p \phi_i} = \mu 
+$$
+
+-   Outra forma de escrever o processo ARMA, considerando a média incondicional $\mu$: 
+
+$$
+\begin{eqnarray*}  
+    y_t &=& \mu + \sum_{i=1}^p \phi_i (L^i y_t - \mu) + \sum_{j=0}^q L^j \theta_j \epsilon_t \\
+    y_t &=& \mu + \frac{1 + \sum_{j=0}^q L^j \theta_j}{1- \sum_{i=1}^p \phi_i L^i}  \epsilon_t \\
+    y_t &=& \mu + \psi(L)  \epsilon_t \\
+    \end{eqnarray*}
+    $$
+    
+    
+
+-   As autocovariâncias são construídas de forma simular ao que fizemos para o AR(2): encontramos $(y_t - \mu)$ e tomamos o operador esperança. Substituindo o valor da média na equação do processo:
+
+$$
+$$
+
+
+$$
+    \begin{eqnarray*}  
+    (y_t - \mu) &=& \sum_{i=1}^p \phi_i (y_{t-i} - \mu) + \sum_{j=0}^q \theta_j \epsilon_{t-j}\\
+    (y_t - \mu)  &=& \psi(L)  \epsilon_t  \\
+    \end{eqnarray*} 
+$$
+
+-   Para uma autocovariância de ordem $h$ maior do que a ordem $q$ do processo MA, vale $E[\epsilon_{t-j}(y_{t-h} - \mu)] =0$. Então podemos encontrar um processo autorregressivo de ordem $p$:
+
+$$
+\gamma_h = \phi_1 \gamma_{h-1} + \phi_2 \gamma_{h-2} + \ldots + \phi_p \gamma_{h-p}, \quad h=q+1, q+2, q+3, \ldots
+$$
+
+-   Quando $h \le q$, as funções de autocovariâncias se tornam complicadas pois $E[\epsilon_{t-j}(y_{t-h} - \mu)] \neq 0$.
+-   Por isso, vamos trabalhar com funções de autocovariância/autocorrelação que são maiores do que a ordem do processo MA.
+-   Importante: para estimar modelos ARMA(p,q) é preciso que eles sejam estáveis. Isso significa que as raízes das equações características dos processos AR(p) e MA(q) devem estar simultaneamente fora do círculo unitário!!!!
+
+Exemplo: Vamos simular um modelo ARMA(2,2) no R.
+
+```{r}
+# Definir os coeficientes do modelo AR(p)
+p <- 2
+ar_coef <- c(1.3, -0.5)  # Coeficientes AR
+q <- 2
+ma_coef <- c(0.9, 0.3)   # Coeficientes MA
+
+# Número de observações
+n <- 1000
+
+# Simular a série temporal AR(p)
+set.seed(123)  # Para reprodutibilidade
+arma_sim <- arima.sim(model = list(ar = ar_coef, ma = ma_coef), n = n)
+
+
+plot(arma_sim, main = "Série Temporal Simulada ARMA(2,2)")
+```
+
+Vamos verificar se as raízes do processo estão fora do círculo unitário. Precisamos verificar as raízes da parte AR e da parte MA.
+
+```{r}
+
+# Calcular as raízes dos polinômios característicos
+polinomio_ar <- c(1, -ar_coef) # sinal negativo no caso ar: condição p/ var positiva
+raizes_ar <- polyroot(polinomio_ar)
+
+polinomio_ma <- c(1, +ma_coef) # sinal positivo no caso ma: condição p/ var positiva
+raizes_ma <- polyroot(polinomio_ma)
+
+print(c(raizes_ar, raizes_ma))
+
+# Plotar o círculo unitário
+plot(0, 0, type = "n", xlab = "Parte Real", ylab = "Parte Imaginária",
+     xlim = c(-1.5, 1.5), ylim = c(-1.5, 1.5), asp = 1)
+symbols(0, 0, circles = 1, inches = FALSE, add = TRUE)
+
+# Plotar as raízes
+points(Re(raizes_ar), Im(raizes_ar), col = "red", pch = 19)
+points(Re(raizes_ma), Im(raizes_ma), col = "orange", pch = 19)
+
+# Adicionar título
+title("Raízes do Polinômio Característico no Círculo Unitário")
+```
+
+Então, se todas as raízes estão fora do círculo unitário, o modelo ARMA é estável. Vamos calcular as funções de autocorrelação:
+
+```{r}
+par(mfrow=c(1,2))
+
+vacf = acf(arma_sim, lag.max = 12, main="ACF")
+
+vpacf = pacf(arma_sim, lag.max =12 , main="PACF")
+```

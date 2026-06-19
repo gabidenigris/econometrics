@@ -1,0 +1,287 @@
+---
+title: 'Aula 0: Revisão de Estatística'
+author: "Silvio Costa"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+format:
+  html:
+    fig-width: 8
+    fig-height: 4
+    code-fold: true
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(ggplot2)
+library(stats)
+```
+
+# 1 Objetivo
+
+Este documento contém uma revisão estatística selecionada para melhorar
+a introdução à econometria de séries de tempo e aos ambientes
+computacionais utilizados durante o curso. Não substitui a revisão
+individual do aluno sobre os conteúdos das disciplinas pré-requisitos.
+
+------------------------------------------------------------------------
+
+# 2 Revisão de Estatística
+
+## 2.1 Variáveis Aleatórias
+
+**Definição.** Uma função $X$ que atribui um número a cada resultado no
+espaço amostral $\Omega$ é uma variável aleatória. Variáveis aleatórias
+podem ser discretas ou contínuas.
+
+-   Discreta: assume valores finitos ou enumeráveis (ex: número de
+    filhos).
+-   Contínua: assume qualquer valor em um intervalo $\mathbb{R}$ (ex:
+    altura, renda)
+
+### Exemplos:
+
+Considere o crescimento trimestral do PIB $X$. Podemos modelar $X$ como
+uma variável contínua com distribuição aproximada Normal.
+
+### Outros exemplos?
+
+## 2.2 Função de probabilidade (PF):
+
+Para variável aleatória discreta, vale o conceito de função de
+probabilidade: $$P(X=x)$$ Exemplo: Bernoulli, Binomial, Poisson
+
+### Algumas Distribuições Discretas:
+
+**Bernoulli**: $X \in \{0,1\}$ $$
+P(X=1)=p,\quad P(X=0)=1-p,
+$$ $$
+E[X]=p,\quad \operatorname{Var}(X)=p(1-p)
+$$
+
+**Binomial**: $$
+P(X=k)=\binom{n}{k} p^k (1-p)^{n-k}
+$$
+
+$$
+E[X]=np,\quad \operatorname{Var}(X)=np(1-p).
+$$
+
+**Poisson**: $$
+P(X=k)=e^{-\lambda}\frac{\lambda^k}{k!}
+$$
+
+$$
+E[X]=\lambda,\quad \operatorname{Var}(X)=\lambda.
+$$
+
+## 2.3 Função Densidade de Probabilidade (PDF)
+
+Para variável contínua $X$ com fdp $f(x)$:
+
+$$
+P[a \le X \le b] = \int_a^b f(x)\,dx.
+$$ Exemplo: Normal, Exponencial
+
+### Algumas Distribuições Contínuas:
+
+**Exponencial**: $$
+P(X>t)=e^{-\lambda t}
+$$
+
+$$ E[X]=\frac{1}{\lambda},\quad \operatorname{Var}(X)=\frac{1}{\lambda^2}
+$$
+
+**Normal**:
+
+$$
+f(x)=\frac{1}{\sqrt{2\pi\sigma^2}}\exp\left\{-\frac{1}{2}\left(\frac{x-\mu}{\sigma}\right)^2\right\}
+$$
+
+$$
+E[X]=\mu,\quad \operatorname{Var}(X)=\sigma^2
+$$
+
+## 2.4 Função de Distribuição Acumulada (CDF):
+
+$$ 
+F(x) = P(X \le x)
+$$
+
+válida para qualquer tipo de variável aleatória.
+
+## 2.5 Vetores Aleatórios
+
+Sejam $Y_1,Y_2$ variáveis aleatórias; o par $(Y_1,Y_2)$ é um vetor
+aleatório. Em séries temporais, muitas vezes as observações não são
+independentes e identicamente distribuídas (não-i.i.d.).
+
+------------------------------------------------------------------------
+
+# 3 Esperança
+
+O operador Esperança de uma variável aleatória X é definido como o valor
+esperado: $$
+E[X]=\begin{cases}
+\sum_x x\,P(X=x), & X \text{ discreta},\\[4pt]
+\int_{-\infty}^{\infty} x f(x)\,dx, & X \text{ contínua}.
+\end{cases}
+$$
+
+Propriedades importantes:
+
+-   $E[aX+b]=aE[X]+b$
+-   $E[X+Y]=E[X]+E[Y]$
+-   $Var(X)=E[X^2]-[E[X]]^2$
+-   $Var(aX)=a^2Var(X)$
+
+### Exemplo (R e Python): expectativa e variância do crescimento do PIB simulado
+
+```{r example_pib_r}
+set.seed(2025)
+n <- 100
+pib_growth <- rnorm(n, mean = 0.01, sd = 0.02) # crescimento trimestral médio 1%
+mean(pib_growth)
+var(pib_growth)
+hist(pib_growth, main = "Simulação: Crescimento do PIB (R)", xlab = "Taxa trimestral")
+```
+
+```{python}
+#%% python
+import numpy as np
+import matplotlib.pyplot as plt
+np.random.seed(2025)
+n = 100
+pib_growth = np.random.normal(0.01, 0.02, n)
+print("Mean:", pib_growth.mean())
+print("Var:", pib_growth.var(ddof=1))
+plt.hist(pib_growth, bins=15)
+plt.title("Simulação: Crescimento do PIB (Python)")
+plt.xlabel("Taxa trimestral")
+plt.show()
+```
+
+------------------------------------------------------------------------
+
+# 4 Esperança Condicional e Incondicional
+
+**Definição.** A esperança condicional de $Y$ dado $X$ é $E[Y\mid X]$. A
+esperança incondicional satisfaz a regra: $$
+E[Y]=E\left[ E[Y\mid X]\right].
+$$
+
+### Exemplo:
+
+Previsão da inflação $\pi_t$ condicional à taxa Selic $r_t$:
+$E[\pi_t \mid r_t]$.
+
+Em R e Python podemos estimar $E[\pi \mid r]$ por regressão linear
+simples (exemplo numérico simulado abaixo).
+
+```{r cond_expect_r}
+set.seed(1)
+n <- 200
+r <- rnorm(n, mean=0.08, sd=0.01) # taxa Selic simulada
+pi <- 0.02 + 0.5*(r - 0.08) + rnorm(n, sd=0.005)
+summary(lm(pi ~ r))
+```
+
+```{python}
+#%% python
+import statsmodels.api as sm
+import numpy as np
+np.random.seed(1)
+n = 200
+r = np.random.normal(0.08, 0.01, n)
+pi = 0.02 + 0.5*(r - 0.08) + np.random.normal(0, 0.005, n)
+X = sm.add_constant(r)
+model = sm.OLS(pi, X).fit()
+print(model.summary())
+```
+
+------------------------------------------------------------------------
+
+# 5 Princípio da Máxima Verossimilhança (MLE)
+
+**Ideia.** Dada uma amostra $x_1,\dots,x_n$ com densidade $f(x;\theta)$,
+a verossimilhança é $$
+L(\theta; x)=\prod_{i=1}^n f(x_i;\theta),
+$$ e a log-verossimilhança $\ell(\theta)=\log L(\theta)$. O estimador de
+máxima verossimilhança (EMV) maximiza $\ell(\theta)$.
+
+## 5.1 Exemplo: Bernoulli
+
+Para $n$ observações Bernoulli com $k$ sucessos: $$
+L(p)=p^k(1-p)^{n-k}.
+$$Maximizando, obtemos o EMV $\hat p = k/n$.
+
+## 5.2 Exemplo: Exponencial
+
+PDF exponencial (parâmetro $\alpha$): $$
+f(x;\alpha)=\frac{1}{\alpha} e^{-x/\alpha},\quad x\ge 0.
+$$ Função Verossimilhança: $$
+L(\alpha)=\alpha^{-n}\exp\left(-\frac{\sum_i x_i}{\alpha}\right),
+$$ Função log-verossimilhança: $$
+\ell(\alpha)=-n\log\alpha - \frac{\sum_i x_i}{\alpha}.
+$$ Derivando e igualando a zero: $$
+\hat\alpha_{MV}=\frac{1}{n}\sum_{i=1}^n x_i.
+$$
+
+## 5.3 Estimação por MLE em R e Python (exponencial com dados simulados)
+
+Suponha que $X$ represente o tempo (em meses) até retorno a pleno
+emprego após choque — modelo exponencial.
+
+```{r mle_exp_r}
+set.seed(2025)
+n <- 50
+x <- rexp(n, rate = 1/0.5) # média 0.5 meses hipotética
+negloglik <- function(alpha) {
+  if (alpha <= 0) return(1e10)
+  -(-n*log(alpha) - sum(x)/alpha)
+}
+res <- optim(par=0.5, fn=negloglik, method="Brent", lower=1e-6, upper=10)
+res$par
+# comparacao com media amostral
+mean(x)
+```
+
+```{python}
+#%% python
+import numpy as np
+from scipy import optimize
+np.random.seed(2025)
+n = 50
+x = np.random.exponential(scale=0.5, size=n)
+def negloglik(alpha):
+    if alpha <= 0:
+        return 1e10
+    return -(-n*np.log(alpha) - x.sum()/alpha)
+res = optimize.minimize_scalar(negloglik, bounds=(1e-6,10), method='bounded')
+print("MLE alpha (scipy):", res.x)
+print("Sample mean:", x.mean())
+```
+
+------------------------------------------------------------------------
+
+# 6 Critérios de Informação (AIC, BIC, HQ)
+
+Considere um modelo com log-verossimilhança máxima $\ell_{\max}$ e $k$
+parâmetros.
+
+-   AIC: $$
+    \mathrm{AIC} = -2\ell_{\max} + 2k.
+    $$
+-   BIC: $$
+    \mathrm{BIC} = -2\ell_{\max} + k\log(n).
+    $$
+-   Hannan–Quinn (HQ): $$
+    \mathrm{HQ} = -2\ell_{\max} + 2k\log(\log n).
+    $$
+
+------------------------------------------------------------------------

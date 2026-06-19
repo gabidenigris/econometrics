@@ -1,0 +1,203 @@
+---
+title: "Aula 13: Cointegração"
+author: "Silvio Costa"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document:
+  html_notebook: default
+format: 
+  html:
+    fig-width: 8
+    fig-height: 4
+    code-fold: true
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+## Introdução
+
+-   Em econometria queremos avaliar empiricamente teorias econômicas. Em
+    geral, as teorias supõem relações de equilíbrio de longo prazo entre
+    variáveis.
+
+-   De fato, usando modelagem de séries temporais, as variáveis
+    apresentam algum tipo de tendência.
+
+-   Modelos de regressão que envolvem séries temporais apresentando
+    tendência podem gerar resultados inconsistentes (REGRESSÃO ESPÚRIA).
+    As técnicas tradicionais de regressão, tal como Mínimos Quadrados
+    Ordinários (MQO), precisam que as variáveis sejam estacionárias, ou
+    seja, que a média condicional e a variância condicional não oscilem
+    com o tempo.
+
+-   Uma alternativa é o Modelo de Correção de Erros (VEC). Os modelos
+    VEC são construídos a partir da análise de cointegração entre
+    variáveis não estacionárias.
+
+-   Os modelos VAR, opcionalmente estimados por MQO, podem ser usado
+    para modelagem de séries temporais multivariadas. Porém, quando os
+    componentes das séries temporais são cointegrados, os modelos VEC
+    devem ser usados.
+
+-   Em resumo:
+
+    1.  se todos os componentes da série são estacionários, o modelo VAR
+        em nível se aplica sem problemas;
+
+    2.  se temos componentes não estacionários, contamos com duas
+        alternativas:
+
+        1.  Se eles são não estacionários e não cointegrados, deve-se
+            ajustar o VAR em primeiras diferenças
+
+        2.  Se eles são não estacionários, mas cointegrados, deve-se
+            ajustar o Vetor de Correção de Erros (VEC)
+
+## Cointegração
+
+-   Ao introduzir os modelos multivariados de séries não estacionárias,
+    incorporamos fundamentação econômica. Todavia, a dinâmica das séries
+    pode ter comportamento comum nas trajetórias de curto e longo prazo
+    (no sentido econômico).
+
+-   Vamos definir melhor o que seria esse “comportamento comum”,
+    derivado do conceito de cointegração de séries de tempo (Engle e
+    Granger, 1987).
+
+-   A idéia intuitiva de cointegração é que variáveis não estacionárias
+    podem caminhar juntas, isto é, podem ter trajetórias temporais
+    interligadas, de forma que no longo prazo apresentem relação de
+    equilíbrio.
+
+-   **Definição: (Bueno 7.1):** os elementos do vetor $X_t$, de dimensão
+    $n \times 1$, são ditos cointegrados de ordem $(d, b)$, denotados
+    por $X_t \sim CI(d, b)$, se:
+
+    -   Todos os elementos de $X_t$ são $I(d)$;
+
+    -   Existe um vetor $\beta$ tal que\
+        $$ u_t = X_t' \beta \sim I(d - b), \quad b > 0 $$
+
+<!-- -->
+
+-   O primeiro ponto é bastante restritivo. Na prática, usamos a
+    definição mais flexível de Campbell e Perron, que não requer que
+    todas as variáveis tenham a mesma ordem de integração.
+-   Já o segundo ponto indica se o sistema está ou não em equilíbrio de
+    longo prazo. Chamamos $\beta$ de vetor de cointegração.
+-   Podemos reescrever a expressão acima como:
+
+$$
+u_t = 
+\begin{pmatrix}
+x_{1t} \\\\
+x_{2t}
+\end{pmatrix}
+\begin{pmatrix}
+\tilde{\beta}_1 \\\\
+\tilde{\beta}_2
+\end{pmatrix}
+= \tilde{\beta}_1 x_{1t} + \tilde{\beta}_2 x_{2t} = 0
+$$
+
+Assim, podemos pensar em dois cenários:
+
+1.  $u_t = 0$ → variáveis em equilíbrio de longo prazo\
+2.  $u_t \neq 0$ → desvios de curto prazo do equilíbrio
+
+Repare que podem existir inúmeros vetores $\beta$ que satisfazem esta
+expressão (por exemplo, qualquer $k\beta$ em que $k < \infty$).
+
+Nesse sentido, para obter um vetor único, normalizamos o vetor ao
+multiplicá-lo por $\frac{1}{\tilde{\beta}_1}$:
+
+$$
+u_t = 
+\begin{pmatrix}
+x_{1t} \\\\
+x_{2t}
+\end{pmatrix}
+\begin{pmatrix}
+1 \\\\
+\beta_2
+\end{pmatrix}
+= x_{1t} + \beta_2 x_{2t} = 0
+$$
+
+-   Como lidar com sistemas em que as variáveis têm ordem de integração
+    diferentes?Podemos transformar as variáveis de forma a ter um
+    sistema em que todas tenham a mesma ordem.
+
+-   Exemplo: Suponha que $y_t$ e $x_t \sim I(2)$ e $z_t \sim I(1)$:
+
+$$
+\frac{1}{\pi_1} y_t + \beta_0 \frac{1}{\pi_1} x_t = w_t \sim I(1)
+$$
+
+$$
+\pi_1 w_t + \pi_2 z_t = u_t \sim I(0)
+$$
+
+------------------------------------------------------------------------
+
+## Testes de Cointegração
+
+#### Teste de uma equação
+
+-   Engle e Granger (1987) propõem uma metodologia de três passos.
+    Suponha um sistema bivariado em que $y_t$ e $x_t \sim CI(1, 1)$:
+
+1.  Execute o teste de raiz unitária em cada uma das variáveis e
+    verifique que elas são I(1). Se as variáveis forem I(0) não há razão
+    para pensar em cointegração.
+
+2.  Estime a relação de longo prazo $y_t = \alpha + \beta x_t + u_t$ e
+    armazene os resíduos $\hat{u}_t$;
+
+3.  Faça um novo teste de raiz unitária ADF nos resíduos estimados e
+    verifique se são estacionários:
+
+$$
+\Delta \hat{u}_t = \phi\hat{u}_{t-1} + \sum_{i=1}^{p-1} \lambda_{i} \Delta \hat{u}_{t-i} + v_t
+$$
+
+$$
+H_0: \phi = 0
+$$
+
+-   **Importante**: se as variáveis forem cointegradas, os resíduos
+    serão estacionários.
+-   Não rejeitar $H_0$ significa que $u_t$ é não estacionário e portanto
+    $y_t$ e $x_t$ não são cointegradas.
+-   Se a hipótese nula $H_0: \phi= 0$ for rejeitada, não há raiz
+    unitária e, portanto, os resíduos são estacionários (as variáveis
+    cointegram).
+
+### Multicointegração
+
+-   De maneira geral, queremos testar multicointegração: queremos saber
+    se é possível, a partir de combinações lineares entre variáveis
+    $I(2)$ e $I(1)$, obter um processo estacionário.
+
+-   Suponha que $x_{1t}, x_{2t}, x_{3t} \sim I(2)$ e que $y_t$ seja um
+    vetor de variáveis $I(1)$.
+
+-   A intuição do teste é utilizar as variáveis de maior ordem de
+    integração em diferença e verificar se os resíduos são
+    estacionários. O modelo estimado é:
+
+$$
+x_{1t} = \mu + \delta t + b_2 x_{2t} + b_3 x_{3t} + \gamma_2 \Delta x_{2t} + \gamma_3 \Delta x_{3t} + y_t' \omega + u_t
+$$
+
+-   Após estimar o modelo, procede-se ao teste de raiz unitária nos
+    resíduos estimados:
+
+$$
+\Delta \hat{z}_t = \alpha \hat{z}_{t-1} + \sum_{i=1}^{p-1} \lambda_{i+1} \Delta \hat{z}_{t-i} + u_t
+$$
+
+-   Testamos a hipótese $H_0: \alpha = 0$.\
+-   Se rejeitamos $H_0$, não há raiz unitária e as variáveis cointegram.

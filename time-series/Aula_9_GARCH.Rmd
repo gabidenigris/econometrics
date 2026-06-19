@@ -1,0 +1,755 @@
+---
+title: "Aula 9: Modelos GARCH"
+author: "Silvio Costa"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+format: 
+  html:
+    fig-width: 8
+    fig-height: 4
+    code-fold: true
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+## Modelos de Heterocedasticidade Condicional
+
+-   Vimos que uma das premissas fundamentais dos modelos ARIMA é que o
+    termo de erro $\epsilon_t$ é um ruído branco.
+
+-   Usando as técnicas de diagnóstico dos resíduos, testamos
+    empiricamente algumas dessas propriedades dos modelos como a
+    distribuição normal (Teste de Jarque-Bera) e a variância constante
+    (Teste ARCH-LM).
+
+-   Na prática: vimos que nem sempre conseguimos obter um modelo para o
+    qual os resíduos se comportem de fato como um ruído branco!!
+
+-   Mesmo para um modelo estacionarizado por diferenças (por exemplo,
+    retorno diário de um ativo), mesmo passando no teste de Ljung-Box,
+    os resíduos obtidos não passaram pelos testes de Jarque-Bera e
+    ARCH-LM!!!
+
+-   A heteroscedasticidade é um problema que viola as premissas dos
+    modelos ARIMA!! A presença de heteroscedasticidade atrapalha a
+    estimação da variância dos coeficientes. Mesmo que os parâmetros
+    estimados sejam consistentes, a eficiência do estimador é
+    comprometida. Isso gera problemas de inferência!!
+
+-   Nesse caso, para alguns problemas econômico-financeiros, precisamos
+    tratar da estrutura dos resíduos para realizar inferências de
+    maneira robusta.
+
+Motivação:
+
+-   Modelos se preocupam mais com a média e pouco com a variância. A
+    importância do risco e incerteza sobre uma projeção é tão importante
+    quanto o número per se.
+
+-   Fama & French, 2004: discussão sobre as limitações do modelo CAPM
+    para precificação de ativos. Não modelam adequadamente do
+    risco/incerteza!
+
+    -   CAPM tem fraco desempenho empírico: beta vs retorno não se
+        confirma nos dados. Variação dos retornos não é explicada apenas
+        pelo beta
+
+-   A heterocedasticidade condicional é uma característica bastante
+    frequente em séries financeiras. As séries financeiras não tem
+    distribuição normal padrão, pois tem probabilidade elevada de
+    eventos extremos e excesso de curtose.
+
+-   Os modelos ARCH e GARCH tem sido desenvolvidos desde a década de
+    1980 como forma de estimar a variância condicional, sem considerá-la
+    necessariamente constante ao longo do tempo.
+
+Exemplo: modelagem ARIMA para o IBOVESPA
+
+
+```{r}
+# Carregamento dos pacotes necessários
+library(quantmod)     # Para importar dados financeiros
+library(forecast)     # Para modelagem ARIMA e diagnóstico
+library(tseries)      # Para teste de estacionariedade (ADF)
+library(FinTS)        # Para teste ARCH de heteroscedasticidade
+```
+
+
+```{r}
+
+# Importação dos dados do IBOVESPA a partir do Yahoo Finance
+getSymbols("^BVSP", src = "yahoo", from = "2018-01-01", auto.assign = TRUE)
+ibov <- na.omit(Cl(BVSP))  # Seleciona apenas os preços de fechamento e remove NAs
+
+# Transformação logarítmica para estabilizar a variância
+log_ibov <- log(ibov)
+
+# Diferenciação para tornar a série estacionária
+diff_ibov <- diff(log(ibov))[-1]
+
+# Visualização da série temporal original
+plot(ibov, main = "IBOVESPA - Fechamento Diário", col = "blue")
+
+# Visualização dos retornos logarítmicos
+plot(diff_ibov, main = "Retornos Logarítmicos Diários", col = "darkgreen")
+
+
+```
+
+```{r}
+
+par(mfrow=c(1,2))
+
+acf(diff_ibov)
+
+pacf(diff_ibov)
+```
+
+```{r}
+
+# Ajuste automático do modelo ARIMA
+fit <- auto.arima(log_ibov)
+summary(fit)
+
+resids <- residuals(fit)
+
+
+```
+
+```{r}
+# Estimar a densidade kernel
+densidade <- density(resids, kernel = "gaussian")
+
+# Plotar a densidade kernel
+plot(densidade, main = "Estimativa de Densidade Kernel", col = "black", lwd=2)
+
+hist(resids, freq = FALSE, add = TRUE, breaks = 100, col = "lightblue")
+
+sigma_emp = sd(resids)
+lines(density(rnorm(10000,0, sigma_emp)), col = "red", lwd=2)
+
+lines(densidade, col = "black", lwd=2)
+
+```
+
+```{r}
+# Diagnóstico dos resíduos
+
+# Verificação gráfica dos resíduos
+checkresiduals(fit)
+
+# Teste de Ljung-Box para autocorrelação dos resíduos
+Box.test(resids, lag = 20, type = "Ljung-Box")
+
+# Teste ARCH para heteroscedasticidade nos resíduos
+ArchTest(resids, lags = 12)
+
+```
+
+------------------------------------------------------------------------
+
+## Modelos da família GARCH
+
+### ARCH(q): Autoregressive Conditional Heteroskedasticity
+
+-   O modelo mais simples para representar a variância dos resíduos foi
+    apresentado por Engle (1982). Seja $\epsilon_t$ um processo
+    estocástico condicional à informação em t-1 (por exemplo, os
+    resíduos de um modelo da família ARIMA):
+    $$ \epsilon_t = \sigma_t u_t \quad \quad u_t \sim i.i.d(0,1)$$
+    $$\sigma^2_t = \omega + \sum_{i=1}^{q} \alpha_i \epsilon^2_{t-i}$$
+
+-   Da mesma forma que nos modelos ARIMA, o modelo ARCH propôe uma
+    estrutura autorregressiva sobre os resíduos passados. Precisamos
+    verificar a estacionaridade deste modelo!
+
+-   A variância incondicional do processo $\epsilon_t$ é dada por: $$
+    var(\epsilon_t) = E(\epsilon_t^2) = E(\sigma^2 u_t^2) = \sigma_\epsilon^2 = \frac{\omega}{1 - \sum_{i=1}^q \alpha_i}
+    $$
+
+-   Um ARCH(q) será estacionário e a variância estimada será bem
+    definida se:
+
+    1.  $\omega > 0$
+    2.  $\alpha_i \geq 0$ para todo i
+    3.  $\sum_{i=1}^{q} \alpha_i < 1$ (Condição de Estabilidade)
+
+### GARCH(p,q)
+
+-   O modelo GARCH é uma generalização do modelo ARCH, acrescentando uma
+    parte autoregressiva para a dinâmica da variância:
+
+    $$\sigma^2_t = \omega + \sum_{i=1}^{q} \alpha_i \epsilon^2_{t-i} + \sum_{j=1}^{p} \beta_j\sigma^2_{t-j}$$
+
+-   O modelo GARCH é mais parcimonioso do que o modelo ARCH. Por que?
+
+-   A variância do modelo GARCH é dada por:
+
+$$
+E(\sigma_t^2) = \frac{\omega}{1 - \sum_{i=1}^q \alpha_i - \sum_{j=1}^p \beta_j}
+$$
+
+-   A condição suficiente para a estacionaridade é que as raízes do
+    polinomial da variância estejam fora do círculo unitário, e:
+    1.  $\omega > 0$
+    2.  $\alpha_i , \beta_j \geq 0$ para todo i e j
+    3.  $\sum_{i=1}^{q} \alpha_i + \sum_{j=1}^{p} \beta_j < 1$ (Condição
+        de Estabilidade)
+-   Importante: a variância $\sigma^2_t$ é um processo determinístico,
+    pois depende apenas de fatores passados e conhecidos. Logo, os
+    modelos GARCH não são estocásticos (não tem resíduo).
+
+------------------------------------------------------------------------
+
+## Identificação dos modelos GARCH
+
+-   Há muitos casos em que os resíduos de modelos univariados não são
+    homocedásticos.
+
+-   Neste caso, podemos usar modelos ARCH e GARCH são especificar a
+    heterocedasticidade condicional dos modelos.
+
+-   A intuição é muito parecida com a dos modelos ARMA, com a diferença
+    que os análogos dos termos AR(p) e MA(q) são construídos com base
+    nos resíduos estimados para a variância $\sigma^2_t$.
+
+-   Assim, os testes de identificação dos modelos ARCH(q) e GARCH(p,q)
+    são construídos de forma muito semelhante ao que vimos para os
+    modelos ARMA(p,q).
+
+#### FAC e FACP
+
+-   As funções de autocorrelação (FAC) e autocorrelação parcial (FACP)
+    seguem a mesma lógica utilizada para avaliar o ordem dos componentes
+    AR(p) e MA(q).
+
+-   Parte-se da definição de variância como o quadrado dos erros
+    estimados:$$\bar{\sigma}^2 = \frac{1}{T} \sum_{t=1}^{T} \hat{\epsilon}_t^2$$
+
+-   FAC: com o quadrados dos resíduos, se calcula a correlação para cada
+    período
+    $$\hat{\rho_j} = \frac{\sum_{t=j+1}^{T}(\hat{\epsilon}_t^2 - \bar{\sigma}^2)(\hat{\epsilon}_{t-j}^2 - \bar{\sigma}^2)}{\sum_{t=1}^{T}(\hat{\epsilon}_t^2 - \bar{\sigma}^2)}$$
+
+    -   Haverá a possibilidade de um modelo da família GARCH se valores
+        de $\hat{\rho_j}$ forem estatisticamente diferentes de zero.
+
+-   FACP: de maneira similar ao ARIMA, é obtida representando-se em um
+    gráfico os coeficientes $\phi_{s,s}$ contra a defasagem s a partir
+    da
+    equação:$$\hat{\epsilon}_t^2 = \phi_s + \phi_{s,1}\hat{\epsilon}_{t-1}^2 + \phi_{s,2}\hat{\epsilon}_{t-2}^2 + ... + \phi_{s,s}\hat{\epsilon}_{t-s}^2 + u_t$$
+
+-   Importante: diferenças em relação à idenficação nos modelos ARMA:
+
+    -   A FAC aqui nos dá a ordem máxima da autoregressão (GARCH)
+        representada por $\hat{\epsilon}_{t-i}^2$
+
+    -   A FACP mostra a ordem máxima p de médias móveis, termo
+        $\sigma_{t-j}^2$.
+
+-   As dificuldades de estimação são as mesmas dos modelos ARMA(p,q)
+
+#### Teste de Ljung-Box
+
+-   A estatística Q de Ljung-Box pode ser usada para testar a presença
+    de heterocedasticidade condicional.
+
+-   Neste caso a hipótese nula é dada por
+    $$H_0 : \sum_{j=1}^{n} \hat{\rho_j} = 0$$
+    $$H_A : \hat{\rho_j} \neq 0$$ - Em que
+    $$Q = T(T + 2) \sum_{j=1}^{n} \frac{\hat{\rho}_j^2}{T - j} \sim \chi^2_n$$
+
+#### Teste LM
+
+-   Define-se o teste com base em Engle (1982) e Lee (1991)
+    $$H_0 : \alpha_1 = \alpha_2 = ... = \alpha_q = 0$$
+
+$$H_A : \alpha_i \neq 0$$
+
+Em
+que:$$\hat{\epsilon}_t^2 = \alpha_0 + \alpha_1\hat{\epsilon}_{t-1}^2 + \alpha_2\hat{\epsilon}_{t-2}^2 + ... + \alpha_q\hat{\epsilon}_{t-s}^2 + u_t$$
+
+-   A estatística de teste é dada por $$TR^2 \sim \chi^2_n$$
+
+-   Rejeitar a hipótese nula: indica que a covariância condicional não é
+    constante.
+
+-   Para os modelos GARCH, ainda são válidas as análises dos Critérios
+    de Informação de Akaike, Schwarz e Hannan-Quinn.
+
+-   Pela sua facilidade de aplicação e interpretação, este método é
+    bastante utilizado para definir a melhor especificação dos modelos
+    ARCH e GARCH.
+
+-   Uma peculiaridade nesta literatura são os testes de simetria do
+    GARCH, que podem definir tipos específicos de modelo que podem ser
+    empregados (Hegerud, 1997).
+
+Exemplo: testando os resíduos do modelo IBOV:ARIMA(0,1,2)
+
+```{r}
+
+sqr_resid <- resids^2
+
+
+par(mfrow=c(1,2))
+
+vacf = acf(sqr_resid, lag.max = 30, main="ACF")
+
+vpacf = pacf(sqr_resid, lag.max =30, main="PACF")
+
+```
+
+```{r}
+# Teste de Ljung-Box para autocorrelação dos resíduos
+Box.test(sqr_resid, lag = 30, type = "Ljung-Box")
+```
+
+```{r}
+
+
+library(lmtest)
+
+
+# Ajuste um modelo linear com os resíduos defasados
+mod_sqrresid_lm <- lm(sqr_resid ~ ., data = sqr_resid)
+# summary(mod_resid_lm)
+
+# Realizando o teste de Breusch-Godfrey para autocorrelação de ordem até 30
+bg_test <- bgtest(mod_sqrresid_lm, order = 30, type = "Chisq")
+# summary(bg_test)
+
+# Exibindo os resultados
+print(bg_test)
+```
+
+------------------------------------------------------------------------
+
+## Estimação de Modelos
+
+-   Geralmente, usa-se o método de máxima verossimilhança.
+
+-   O uso do método da máxima verossimilhança depende de hipóteses sobre
+    a verdadeira distribuição dos dados.
+
+-   Em geral costuma-se adotar a hipótese de Distribuição Normal.
+    Entretanto, dados financeiros em geral são mais "pontiagudos" que
+    uma Normal Padrão (leptocurtose).
+
+-   Existem outras abordagens de estimação (GED, estimação de
+    quase-máxima verossimilhança), vamos focar nas hipótese de uma
+    Distribuição Normal ou t-Student.
+
+-   Para dados distribuídos normalmente, temos a função de
+    verossimilhança
+    $$L = L(\Theta; y_t) = \prod_{t=\kappa+1}^{T} \frac{1}{(2\pi\sigma_t^2)^{1/2}} \exp\left(-\frac{\epsilon_t^2}{2\sigma_t^2}\right)$$
+    em que $\Theta$ é o vetor de parâmetros a serem estimados da equação
+    da média e da variância.
+
+-   Neste caso, a estimação utiliza os parâmetros iniciais da variância
+    para a otimização
+    $$\sigma_1^2 = \sigma_2^2 = ... = \sigma_\kappa^2 = \frac{1}{T} \sum_{t=1}^{T} \hat{\epsilon}_t^2$$
+
+-   Supondo a distribuição t-Student, temos a função de verossimilhança:
+    $$L = L(\Theta; y_t) = \prod_{t=\kappa}^{T} \left[\frac{\Gamma\left(\frac{\nu+1}{2}\right)}{\Gamma\left(\frac{\nu}{2}\right)\sqrt{(\nu - 2)\pi\sigma_t^2}} \exp\left(1 + \frac{\epsilon_t^2}{(\nu - 2)\sigma_t^2}\right)\right]$$
+    em que $\Gamma(.)$ é a função gama e adota-se $\nu > 2$
+
+-   Quando $\nu \to \infty$, a distribuição converge para uma Normal.
+
+-   Neste caso, a obtenção dos parâmetros iniciais se dá por MQO, por um
+    ajustamento de um modelo ARIMA, ou pelos parâmetros obtidos num
+    teste LM.
+
+-   Atendidas as condições de regularidade, a máxima verossimilhança
+    garante a consistência e normalidade assintótica dos estimadores.
+
+-   Entretanto, garantir estas condições nos modelos GARCH se mostra
+    extremamente difícil na prática (Bollerslev, Engle e Nelson, 1994).
+    Em geral se prova as condições de regularidade para cada modelos
+    escolhido.
+
+-   No caso de um GARCH(1,1), Lumsdaine (1996) mostram quem para
+    assegurar ergodicidade e estacionaridade é necessário que
+    $$E\ln|\alpha_1u_t^2 + \beta_1| < 0$$ Para o qual pela desigualdade
+    de Jensen, temos:
+    $$E\ln|\alpha_1u_t^2 + \beta_1| < \ln E|\alpha_1u_t^2 + \beta_1| = \ln(\alpha_1u_t^2 + \beta_1)$$
+
+```{r}
+# Instale os pacotes necessários, se ainda não tiver
+#librif (!require("rugarch")) install.packages("rugarch", dependencies = TRUE)
+
+library(rugarch)
+
+# Função para testar diferentes modelos GARCH
+testar_modelos_garch <- function(residuos, max_p = 2, max_q = 2) {
+  resultados <- data.frame(
+    Modelo = character(),
+    Ordem = character(),
+    AIC = numeric(),
+    BIC = numeric(),
+    LogLik = numeric(),
+    stringsAsFactors = FALSE
+  )
+  
+  modelos <- c("sGARCH")  # ,"eGARCH", "gjrGARCH"
+  
+  for (modelo in modelos) {
+    for (p in 1:max_p) {
+      for (q in 1:max_q) {
+        spec <- ugarchspec(
+          variance.model = list(model = modelo, garchOrder = c(p, q)),
+          mean.model = list(armaOrder = c(0, 0), include.mean = FALSE),
+          distribution.model = "norm"
+        )
+        
+        fit <- tryCatch(
+          ugarchfit(spec, residuos, solver = "hybrid"),
+          error = function(e) NULL
+        )
+        
+        if (!is.null(fit)) {
+          resultados <- rbind(resultados, data.frame(
+            Modelo = modelo,
+            Ordem = paste0("(", p, ",", q, ")"),
+            AIC = infocriteria(fit)[1],
+            BIC = infocriteria(fit)[2],
+            LogLik = likelihood(fit)
+          ))
+        }
+      }
+    }
+  }
+  
+  resultados[order(resultados$AIC), ]
+}
+
+# Exemplo de uso:
+resultados <- testar_modelos_garch(resids, max_p = 4 , max_q = 4 )
+print(resultados)
+
+```
+
+### Previsão
+
+-   Nos modelos econométricos convencionais, a incerteza do erro de
+    previsão é crescente com o horizonte de tempo (e não depende do
+    ponto de origem).
+
+-   Nos modelos de heterocedasticidade convencional, a acurácia da
+    previsão depende do conjunto de informações disponíveis no momento
+    da previsão. Assim, os intervalos de confiança exige a avaliação das
+    variâncias condicionais dos erros futuros.
+
+-   A dificuldade reside no fato dos erros não serem normalmente
+    distribuídos, o que torna mais desafiador o trabalho de previsão.
+
+-   A previsão é análoga aos modelos ARIMA: prevê-se um passo à frente,
+    com o resultado obtido, faz-se o passo seguinte e assim
+    sucessivamente.
+
+------------------------------------------------------------------------
+
+Exercício: Prever com GARCH
+
+```{r}
+
+
+
+library(forecast)
+library(rugarch)
+
+
+# Ajustar ARIMA
+fit_arima <- auto.arima(log_ibov)
+summary(fit_arima)
+
+
+```
+
+GARCH sobre os resíduos:
+
+```{r}
+
+# Ajustar ARIMA-GARCH
+spec <- ugarchspec(
+  variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+  mean.model = list(armaOrder = c(0,0), include.mean = FALSE),
+  distribution.model = "norm"
+)
+
+fit_garch <- ugarchfit(spec, residuals(fit_arima))
+
+show(fit_garch)
+
+garch_coef <- coef(fit_garch)
+garch_residuals <- residuals(fit_garch, standardize = TRUE)
+
+```
+
+
+```{r}
+# Estimar a densidade kernel
+garch_densidade <- density(garch_residuals, kernel = "gaussian")
+
+# Plotar a densidade kernel
+plot(garch_densidade, main = "Estimativa de Densidade Kernel nos resíduos GARCH", col = "black", lwd=2)
+
+hist(garch_residuals, freq = FALSE, add = TRUE, breaks = 100, col = "lightblue")
+
+sigma_emp = sd(garch_residuals)
+lines(density(rnorm(10000,0, sigma_emp)), col = "red", lwd=2)
+
+lines(garch_densidade, col = "black", lwd=2)
+```
+
+
+
+```{r}
+
+
+library(forecast)
+library(ggplot2)
+library(zoo)
+
+
+fcast_arima <- forecast(fit_arima, h = 10)
+
+fcast_garch <- ugarchforecast(fit_garch, n.ahead = 10)
+
+
+```
+Gráfico comparando as duas projeções:
+
+```{r}
+
+
+# Extrair previsões e intervalos
+garch_mean <- fcast_arima$mean
+garch_sigma <- sigma(fcast_garch)
+garch_upper <- garch_mean + 1.96 * garch_sigma
+garch_lower <- garch_mean - 1.96 * garch_sigma
+
+
+# Extrair os últimos 30 pontos da série original
+serie_final <- tail(log_ibov, 30)
+datas_hist <- as.Date(time(serie_final))
+ultima_data <- max(datas_hist)
+
+# Datas da previsão
+datas_prev <- seq(ultima_data + 1, by = "day", length.out = length(fcast_arima$mean))
+
+
+# Criar data.frames
+df_hist <- data.frame(Data = datas_hist, Valor = as.numeric(serie_final))
+df_prev <- data.frame(
+  Data = datas_prev,
+  Media = as.numeric(fcast_arima$mean),
+  LimiteInferior = as.numeric(fcast_arima$lower[,2]), # 95%
+  LimiteSuperior = as.numeric(fcast_arima$upper[,2]) # 95%
+)
+
+# Adiciona o último ponto da série histórica como primeiro da previsão
+ultimo_ponto <- data.frame(
+Data = ultima_data,
+Media = tail(df_hist$Valor, 1),
+LimiteInferior = tail(df_hist$Valor, 1),
+LimiteSuperior = tail(df_hist$Valor, 1)
+)
+
+df_prev <- rbind(ultimo_ponto, df_prev)
+
+
+df_prev_garch <- data.frame(
+  Data = datas_prev,
+  Media = as.numeric(garch_mean),
+  LimiteInferior = as.numeric(garch_lower), # 95%
+  LimiteSuperior = as.numeric(garch_upper) # 95%
+)
+
+df_prev_garch <- rbind(ultimo_ponto, df_prev_garch)
+
+
+# Plot com ggplot2
+ggplot() +
+ geom_line(data = df_hist, aes(x = Data, y = Valor), color = "black") +
+ geom_line(data = df_prev, aes(x = Data, y = Media), color = "blue") +
+ geom_ribbon(data = df_prev, aes(x = Data, ymin = LimiteInferior, ymax = LimiteSuperior), 
+ fill = "blue", alpha = 0.2) +
+coord_cartesian(ylim = c(11.75, 11.90)) +
+ labs(title = "Previsão ARIMA com Intervalo de Confiança 95%",
+ x = "Data", y = "Valor") +
+ theme_minimal()
+
+
+# Plot com ggplot2
+ggplot() +
+ geom_line(data = df_hist, aes(x = Data, y = Valor), color = "black") +
+ geom_line(data = df_prev_garch, aes(x = Data, y = Media), color = "red") +
+ geom_ribbon(data = df_prev_garch, aes(x = Data, ymin = LimiteInferior, ymax = LimiteSuperior), 
+ fill = "red", alpha = 0.2) +
+  coord_cartesian(ylim = c(11.75, 11.90)) +
+ labs(title = "Previsão ARIMA-GARCH com Intervalo de Confiança 95%",
+ x = "Data", y = "Valor") +
+ theme_minimal()
+
+
+
+```
+
+
+------------------------------------------------------------------------
+
+## Outras possibilidades de modelos de volatilidade condicional
+
+### GARCH-M
+
+-   Modelos GARCH-M (GARCH-in-Mean) são uma extensão dos modelos GARCH
+    tradicionais, muito utilizados em finanças para capturar a relação
+    entre retorno esperado e risco (volatilidade).
+
+-   O modelo GARCH-M incorpora a variância condicional diretamente na
+    equação da média do processo.
+
+-   A ideia é que o retorno esperado de um ativo pode depender do seu
+    risco — medido pela variância ou desvio padrão condicional.
+
+-   A inclusão da variância na equação da média permite capturar o
+    comportamento de investidores que exigem prêmios de risco maiores em
+    períodos de maior incerteza. Isso torna o modelo mais realista em
+    contextos de alta volatilidade.
+
+-   Um modelo GARCH-M(1,1) típico pode ser escrito como:
+
+    -   Equação da média: $$
+        y_t = \mu + \lambda \cdot \sigma_t^2 + \epsilon_t
+        $$
+
+    -   Equação da variância condicional GARCH(1,1): $$
+        \sigma_t^2 = \omega + \alpha \cdot \epsilon_{t-1}^2 + \beta \cdot \sigma_{t-1}^2
+        $$
+
+    -   $\lambda$: coeficiente que mede o impacto do risco (variância)
+        sobre o retorno esperado.
+
+    -   Se $\lambda > 0$, isso sugere que maior risco está associado a
+        maior retorno esperado, o que é consistente com a teoria
+        financeira.
+
+-   Muito usado em modelagem de retornos financeiros, como ações, moedas
+    e commodities, porque permite testar empiricamente a relação
+    risco-retorno.
+
+-   Aplicações: precificação de ativos, gestão de risco e alocação de
+    portfólio.
+
+### TGARCH(p,q,r)
+
+-   É um modelo GARCH com limiar, que permite capturar assimetria na
+    volatilidade.
+
+-   Por exemplo, choques negativos tendem a aumentar mais a volatilidade
+    do que choques positivos de mesma magnitude. Esse comportamento é
+    chamado de efeito alavancagem.
+
+-   Modelos GARCH tradicionais não capturam assimetria, pois tratam
+    choques positivos e negativos da mesma forma.
+
+-   Um modelo TGARCH(p,q,r) tem a seguinte especificação para a
+    variância:
+
+$$\sigma^2_t = \omega + \sum_{i=1}^{q} \alpha_i \epsilon^2_{t-i} + \sum_{j=1}^{p} \beta_j\sigma^2_{t-j} + \sum_{k=1}^{r} \gamma_k D_{(\epsilon_{t-k}\le 0)} . |\epsilon^2_{t-k}| $$
+
+-   $\gamma$ mede o efeito assimétrico e $D$ é uma função indicadora
+    (dummy) se o choque foi negativo ou não. Se $\gamma > 0$ significa
+    que choques negativos aumentam mais a vol do que choques positivos!
+
+-   Aplicações: modelagem de retornos de ações, precificação de opções,
+    gestão de risco, VaR...
+
+### EGARGH(p,q,r)
+
+-   Modelos GARCH tradicionais impõem que os coeficientes sejam não
+    negativos para garantir que a variância condicional seja positiva.
+
+-   Modelos EGARCH resolvem isso ao modelar o logaritmo da variância, o
+    que garante positividade, sem aplicar restrições nos parâmetros.
+
+-   Além disso, o EGARCH também permite capturar asimetria (choques
+    negativos aumentam mais a volatilidade do que choques positivos).
+
+-   Especificação de um EGARCH para a variância:
+
+$$ln(\sigma^2_t) = \omega + \sum_{i=1}^{q} \alpha_i [|u_{t-i}| - E(|u_{t-i}|)] + \sum_{j=1}^{p} \beta_j \ln{(\sigma^2_{t-j})} + \sum_{k=1}^{r} \gamma_k u_{t-k} $$
+
+onde $u_{t-i} = \epsilon_{t-i}/\sigma_{t-1}$ é o resíduo normalizado
+pela variância em cada período e $\gamma_k$ é o coeficiente de
+assimetria.
+
+-   Vantagens do EGARCH: não exige restrições de coeficientes positivos,
+    captura assimetria de forma direta e é mais adequado para séries com
+    vol assimétrica e com leptocurtose.
+
+### PGARGH(p,q,d)
+
+-   O modelo PGARCH é uma generalização do modelo GARCH tradicional,
+    proposto por Ding, Granger e Engle (1993) e permite maior
+    flexibilidade na forma como a volatilidade reage aos choques.
+
+-   Modelos GARCH tradicionais assumem que a variância condicional
+    depende do quadrado dos resíduos $\epsilon_t^2$.
+
+-   Como sabemos, nem sempre a vol é simétrica para choques positivos e
+    negativos. A relação entre choques e vol pode não ser bem
+    representada pelo quadrado dos resíduos.
+
+-   Especificação do modelo PGARCH:
+
+$$\sigma^d_t = \omega + \sum_{j=1}^{p} \beta_j\sigma^d_{t-j} + \sum_{i=1}^{q} \alpha_i (|\epsilon_{t-i}| - \gamma_i \epsilon_{t-i})^d $$
+
+onde $d>0$ e pode ser estimado em vez de imposto.
+
+-   Com d=1, o modelo se torna uma estimação do desvio-padrão e com d=2,
+    o modelo se torna um GARCH tradicional.
+
+-   Vantagens do PGARCH: permite ajustar o grau de sensibilidade da
+    volatilidade aos choques e captura assimetrial e leptocurtose de
+    forma mais flexível. O GARCH é um caso especial.
+
+-   É mais usado para modelagem financeira em que a vol não tem
+    comportamento linear (respostas assimétricas a choques)
+
+### EWMA
+
+-   O modelo EWMA (*Exponentially Weighted Moving Average*) é uma
+    técnica simples e eficiente para modelar a volatilidade condicional.
+
+-   É amplamente utilizado em gestão de risco, especialmente em
+    Value-at-Risk (VaR).
+
+-   O EWMA é uma média móvel que dá mais peso aos dados mais recentes,
+    permitindo capturar mudanças na volatilidade de forma mais imediata.
+
+-   Especificação do EWMA: a variância condicional no tempo $t$:
+
+$$
+\sigma_t^2 = \lambda \sigma_{t-1}^2 + (1-\lambda) \epsilon_{t-1}^2
+$$
+
+onde $\lambda \in (0,1)$ é o parâmetro de decaimento exponencial.
+
+-   Quanto maior $\lambda$, maior a memória do passado, mais lento é o
+    ajuste da variância a novos choques.
+
+-   RiskMetrics/JP Morgan sugere $\lambda = 0,94$ para séries
+    financeiras.
+
+-   Vantagens: simples de implementar, um único parâmetro para estimar,
+    reage rapidamente ao curto prazo.
+
+-   Desvantagens: não modela assimetria, não captura efeitos de
+    persistência adequadamente, assume que a média dos retornos é zero.
+
+-   É mais utilizado para monitoramento de risco em tempo real.

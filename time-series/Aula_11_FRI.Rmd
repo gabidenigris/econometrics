@@ -1,0 +1,289 @@
+---
+title: "Aula 11: Modelos VAR: Funções de Resposta ao Impulso"
+author: "Silvio Costa"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document:
+  html_notebook: default
+format: 
+  html:
+    fig-width: 8
+    fig-height: 4
+    code-fold: true
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+## Função de Impulso Resposta (IRF)
+
+-   Sims (1980): Suponha que o efeito feedback é limitado. Esta
+    avaliação em geral vem da teoria econômica que nos dá alguma direção
+    sobre o sinal dos coeficientes estruturais:
+
+$$
+y_t = b_{10} + b_{11}y_{t-1} + b_{12}z_{t-1} + e_{yt}
+$$
+
+$$
+z_t = b_{20} - a_{21}y_t + b_{21}y_{t-1} + b_{22}z_{t-1} + e_{zt}
+$$
+
+-   Neste exemplo, a restrição imposta pelo economista é que $z_t$
+    ***não afeta contemporaneamente*** $y_t$, dessa forma $a_{12} = 0$.
+
+-   Importante: repare que a ordem das equações impacta no sentido das
+    restrições que são impostas.
+
+-   Reescrevendo o modelo na forma estrutural:
+
+Equação Estrutural: $$
+\begin{pmatrix}
+1 & 0 \\
+a_{21} & 1
+\end{pmatrix}
+\begin{pmatrix}
+y_t \\
+z_t
+\end{pmatrix}
+= 
+\begin{pmatrix}
+b_{10} \\
+b_{20}
+\end{pmatrix}
++ 
+\begin{pmatrix}
+b_{11} & b_{12} \\
+b_{21} & b_{22}
+\end{pmatrix}
+\begin{pmatrix}
+y_{t-1} \\
+z_{t-1}
+\end{pmatrix}
++ 
+\begin{pmatrix}
+\sigma_y & 0 \\
+0 & \sigma_z
+\end{pmatrix}
+\begin{pmatrix}
+\epsilon_{yt} \\
+\epsilon_{zt}
+\end{pmatrix}
+$$
+
+-   Vamos multiplicar o sistema por $A^{-1}$ para encontrar a forma
+    reduzida diferente e fazer o mapeamento. Repare que a inversa é uma
+    matriz diagonal.
+
+-   Para a matriz de erros, obtemos as seguintes equações:
+
+$$
+\text{VAR}(e_1) = \sigma^2_y
+$$
+
+$$
+\text{VAR}(e_2) = \sigma^2_z + a^2_{21}\sigma^2_y
+$$
+
+$$
+\text{COV}(e_1, e_2) = -a_{21}\sigma^2_y
+$$
+
+-   Para a matriz de coeficientes obtemos mais 6 equações:
+
+$$
+\phi_{10} = b_{10}
+$$
+
+$$
+\phi_{11} = b_{11}
+$$
+
+$$
+\phi_{12} = b_{12}
+$$ $$
+\phi_{20} = -a_{21}b_{10} + b_{20}
+$$
+
+$$
+\phi_{21} = -a_{21}b_{11} + b_{21}
+$$ $$
+\phi_{22} = -a_{21}b_{12} + b_{22}
+$$
+
+-   A metodologia proposta por Sims pode ser generalizada para um vetor
+    com $n$ variáveis endógenas.
+-   Trata-se de uma maneira triangular de decompor os resíduos chamada
+    ***Decomposição de Cholesky***.
+-   Para um VAR com n variáveis endógenas, a matriz de covariância é de
+    dimensão n x n. As condições de identificação requerem a imposição
+    de $\frac{n^2 - n}{2}$ restrições.
+-   A ordenação das variáveis é arbitrária, mesmo que justificada por
+    razões econômicas!
+
+------------------------------------------------------------------------
+
+### Derivação das FRI
+
+-   Quando os autovalores do polinômio característico
+    $(I - \sum^p_{i=1} \Phi_i L^i)$ estiverem foram do círculo unitário,
+    pode-se reescrever um VAR(p) como um vetor de médias móveis infinito
+    VMA($\infty$).
+
+-   Assuma um VAR(1) bivariado: A média de longo prazo dada por
+    $\bar{X} = (I - \Phi_1)^{-1}\Phi_0$;
+
+-   Podemos então reescrever como um VMA:
+
+$$
+X_t = \bar{X} + \sum_{i=0}^{\infty} \Phi_i e_{t-i}
+$$
+
+$$
+= \bar{X} + \sum_{i=0}^{\infty} \frac{\Phi_i}{1 - a_{12}a_{21}} \begin{pmatrix}
+1 & - a_{12} \\
+-a_{21} & 1
+\end{pmatrix} 
+\begin{pmatrix}
+\sigma_y \epsilon_{yt-i} \\
+\sigma_z \epsilon_{zt-i}
+\end{pmatrix}
+$$
+
+$$
+= \bar{X} + \sum_{i=0}^{\infty} \begin{pmatrix}
+\psi_{i,11} & \psi_{i,12} \\
+\psi_{i,21} & \psi_{i,22}
+\end{pmatrix} \begin{pmatrix}
+\sigma_y \epsilon_{yt-i} \\
+\sigma_z \epsilon_{zt-i}
+\end{pmatrix}
+$$
+
+-   **Definição**: A Função de Impulso resposta de um VAR(p) é dada pelo
+    gráfico dos coeficientes $\psi_{i,11}$ e $\psi_{i,21}$ ao longo de
+    $i$ (tempo).
+
+-   **Nota**: como o VAR é um modelo estimado, os coeficientes não são
+    exatos, tem um intervalo de confiança. Logo, esses coeficientes das
+    FRI também possuem intervalo de confiança ao longo do tempo.Neste
+    caso, os desvios padrão são calculados analiticamente ou por
+    simulações de Monte Carlo.
+
+```{r}
+
+library(rbcb)
+library(tseries)    
+library(ggplot2)    
+library(vars)  
+library(lmtest)
+
+ipca_table = get_series(433, start_date = '2000-01-01')
+ipcats = ts( ipca_table$`433`, start = c( 2000, 1 ), frequency = 12 )     # IPCA
+
+ibc_table <- get_series(24364, start_date = '2003-01-01')
+idxibcts <- ts(ibc_table$`24364`, start = c(2003, 1), frequency = 12)     # IBC-BR
+ibcts <- 100*diff(log(idxibcts))
+
+selic_table <- get_series(4189, start_date = '2000-01-01')
+selicts <- ts(selic_table$`4189`, start = c(2000, 1), frequency = 12)     # Selic
+
+
+dbvar <- ts.intersect( ipcats, ibcts, selicts)
+dbvar <- ts(dbvar, start = start(dbvar), frequency = 12)
+
+# Plotando cada série temporal individualmente
+par(mfrow = c(1,3)) # Configura a área de plotagem para 1 linha e 3 colunas
+
+plot(ipcats, main = "IPCA", col = "blue", lwd = 2)
+plot(ibcts, main = "IBC", col = "red", lwd = 2)
+plot(selicts, main = "Selic", col = "green", lwd = 2)
+
+
+```
+
+-   Estimando o VAR:
+
+```{r}
+var_model <- VAR(dbvar, p = 6, type = "const")
+summary(var_model)
+```
+
+Identificacao por Cholesky:
+
+```{r}
+
+library(svars)
+
+# Identificação estrutural via Cholesky
+modelo_chol <- id.chol(var_model)
+
+# Visualizar os choques estruturais
+summary(modelo_chol)
+
+```
+
+Código em R para IRF:
+
+```{r}
+
+
+# Codigo para IRFs no VAR
+irf_model <- irf(modelo_chol, impulse = NULL, response = NULL, ortho= TRUE, n.ahead = 16, boot = TRUE) 
+
+plot(irf_model)
+```
+
+------------------------------------------------------------------------
+
+## Decomposição de Variância
+
+-   É outra forma de analisar os resultados do modelo. Queremos saber
+    que porcentagem do erro de previsão decorre de cada variável
+    endógena ao longo do tempo.
+
+-   Para entender o conceito, tome como exemplo um VAR(1) bivariado
+    escrito em termos de um VMA($\infty$):
+
+$$
+X_{t+h} = \bar{X} + \sum_{i=0}^{\infty} \Psi_i e_{t+h-i}
+$$
+
+-   Calcule o erro de previsão:
+
+$$
+X_{t+h} - E[X_{t+h}|t] = \sum_{i=0}^{h-1} \Psi_i e_{t+h-i}
+$$
+
+-   Se desenvolvermos a expressão matricial para cada variável
+    individual do vetor VMA:
+
+$$
+y_{t+h} - E[y_{t+h}|t] = \psi_{0,11} \epsilon_{yt+h} + \psi_{1,11} \epsilon_{yt+h-1} + \ldots + \psi_{h-1,11} \epsilon_{yt+1}\\
++\psi_{0,12} \epsilon_{zt+h} + \psi_{1,12} \epsilon_{zt+h-1} + \ldots + \psi_{h-1,12} \epsilon_{zt+1}
+$$
+
+-   Ora, fica fácil calcular a variância do erro de previsão a partir
+    dessa equação. Podemos então calcular a variância para o horizonte
+    h, sabendo que os choques $\epsilon$ são todos estruturais e
+    ortogonais: $$
+    \sigma_y^2(h) = \sigma^2_y (\psi_{0,11}^2 + \psi_{1,11}^2 + \ldots + \psi_{h-1,11}^2)\\
+    + \sigma^2_z (\psi_{0,12}^2 + \psi_{1,12}^2 \ldots + \psi_{h-1,12}^2)
+    $$
+
+-   Finalmente, basta normalizar variância de cada endógena no horizonte
+    h: $$
+    1 = \frac{\sigma^2_y}{\sigma_y^2(h)} (\psi_{0,11}^2 + \psi_{1,11}^2 + \ldots + \psi_{h-1,11}^2) + \frac{\sigma^2_z}{\sigma_y^2(h)} (\psi_{0,12}^2 + \psi_{1,12}^2 \ldots + \psi_{h-1,12}^2)
+    $$
+
+Código em R para Decomposição de Variância:
+
+```{r}
+fevd_model <- fevd(var_model, n.ahead = 10)
+print(fevd_model)
+```
+
+------------------------------------------------------------------------
+
+

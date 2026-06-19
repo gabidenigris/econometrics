@@ -1,0 +1,191 @@
+---
+title: "Aula 6: Sazonalidade e Suavização"
+author: "Silvio Costa"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+format: 
+  html:
+    fig-width: 8
+    fig-height: 4
+    code-fold: true
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+## Plano
+
+-   Aprender a identificar e ajustar a sazonalidade em séries temporais.
+-   Implementar o ajuste de sazonalidade por médias móveis.
+-   Implementar o ajuste de sazonalidade utilizando R.
+
+## Motivação
+
+-   Na abordagem tradicional, as séries de tempo são ajustadas por
+    algoritmos determinísticos.
+-   Intuição: expurgar fatores que geram perturbações na série e ter uma
+    noção mais precisa da sua trajetória.
+-   Dentre os algoritmos de suavização para filtrar a sazonalidade de
+    séries temporais, vamos explorar o uso de médias móveis.
+
+## Média Móvel Tradicional
+
+### Definição
+
+-   O modelo de média móvel tradicional assume que o processo é produto
+    de quatro fatores:
+
+$$y_t = C_t \times S_t \times T_t \times U_t$$
+
+onde:
+
+$Ct$: componente de ciclo de longo prazo
+
+$St$: componente sazonal
+
+$Tt$: componente de tendência
+
+$Ut$: componente irregular
+
+-   A abordagem mais básica utiliza médias móveis tradicionais para
+    estimar e expurgar $St$.
+
+-   Hipótese subjacente: componente sazonal é fixo para subperíodos
+    iguais.
+
+### Estimação
+
+-   Para o caso de séries mensais e trimestrais, calculamos a média
+    móvel centrada:
+    $$x_t = \frac{0,5y_{t-6} + y_{t-5} + ... + y_{t+5} + 0,5y_{t+6}}{12}$$
+    $$x_t = \frac{0,5y_{t-2} + y_{t-1} + y_t + yt_{t+1} + 0,5y_{t+2}}{4}$$
+
+-   O filtro de médias móveis tradicional elimina os componentes de
+    sazonalidade ($St$) e irregular ($Ut$).
+
+-   Nesse caso, podemos reescrever $x_t = C_t \times T_t$. Assim, vamos
+    fazer a seguinte manipulação algébrica: $$
+    z_t \equiv \frac{y_t}{x_t} = \frac{C_t \times S_t \times U_t \times T_t}{C_t \times T_t} = S_t \times U_t
+    $$
+
+-   Intuição: ao dividir a série original pela média móvel, obtemos os
+    componentes de sazonalidade ($St$) e irregular ($Ut$).
+
+### Estimação
+
+-   O próximo passo é isolar os termos sazonais do componente irregular.
+
+-   Faremos isso calculando a média de cada subperíodo de $z_t$ (por
+    exemplo, se a periodicidade da série for mensal, calcularemos as
+    médias de janeiro, fevereiro, etc.).
+
+-   Estas médias serão dadas por:
+
+$$ \bar{v_j} = \frac{\sum_{m=0}^{T-j} z_{mq+j}}{T-j+1}, j=1,2,...,q $$
+
+```         
+Em que $q$ representa um número inteiro dentre os subperíodos da
+série temporal.
+```
+
+-   Por fim, normalizamos os índices sazonais pela média geométrica:
+    $$v_j = \frac{\bar{v_j}}{\sqrt[q]{\prod_{j=1}^{q} \bar{v_j}}}$$
+
+-   A normalização nos fornece uma medida relativa do padrão sazonal,
+    permitindo verificar quanto a série original se difere da série
+    dessazonalizada.
+
+-   O passo final é dividir a série de tempo original $y_t$ pelo índice
+    de sazonalidade correspondente ao mês $t$:
+
+    $$ SA_{mq+j} = \frac{y_{mq+j}}{v_j}$$
+
+### Exercício: calcular os fatores sazonais do IPCA
+
+E se os fatores sazonais não forem determinísticos?????
+
+\#
+
+------------------------------------------------------------------------
+
+## Sazonalidade usando a metodologia ARIMA
+
+A metodologia ARIMA (AutoRegressive Integrated Moving Average) é uma das
+técnicas mais utilizadas para modelagem de séries temporais.
+
+Quando lidamos com séries temporais que apresentam padrões sazonais,
+utilizamos uma extensão chamada SARIMA (Seasonal ARIMA).
+
+## Conceitos Básicos
+
+### Modelos ARIMA
+
+Os modelos ARIMA são definidos por três parâmetros: p, d, q:
+
+\- **p**: ordem da parte autoregressiva (AR).
+
+\- **d**: grau de diferenciação necessário para tornar a série
+estacionária.
+
+\- **q**: ordem da parte de média móvel (MA).
+
+### Modelos SARIMA
+
+Os modelos SARIMA incluem componentes sazonais e são definidos por sete
+parâmetros: p, d, q, P, D, Q, m:
+
+\- **P**: ordem da parte autoregressiva sazonal.
+
+\- **D**: grau de diferenciação sazonal.
+
+\- **Q**: ordem da parte de média móvel sazonal.
+
+\- **m**: período sazonal (por exemplo, 12 se dados mensais).
+
+## Identificação da Sazonalidade
+
+Para identificar a sazonalidade em uma série temporal, podemos utilizar
+a decomposição da série em seus componentes: tendência, sazonalidade e
+resíduo. A visualização gráfica é uma ferramenta poderosa para
+identificar padrões sazonais.
+
+## Implementação em R
+
+Vamos implementar um exemplo de ajuste de sazonalidade utilizando a
+metodologia SARIMA em R.
+
+```{r}
+# Carregar pacotes necessários
+library(rbcb)
+library(forecast)
+library(tseries)
+
+# Exemplo de série temporal
+set.seed(123)
+
+# BANCO CENTRAL
+data.ipca = get_series(433, start_date = '2000-01-01')
+ipca_serie_temporal = ts( data.ipca$`433`, start = c( 2000, 1 ), frequency = 12 )     # IPCA
+ts.plot(ipca_serie_temporal, xlab="Meses", ylab="p.p.", main = "IPCA - taxa mensal", col="red", lwd=2)
+
+
+# Decomposição da série temporal
+decomposicao <- decompose(ipca_serie_temporal)
+plot(decomposicao)
+
+# Ajuste do modelo SARIMA
+modelo_sarima <- auto.arima(ipca_serie_temporal, seasonal = TRUE)
+
+# Resumo do modelo
+summary(modelo_sarima)
+
+# Previsão utilizando o modelo SARIMA
+previsao <- forecast(modelo_sarima, h = 12)
+plot(previsao, main = "Previsão com Modelo SARIMA")
+
+# Avaliação do ajuste sazonal
+checkresiduals(modelo_sarima)
+```

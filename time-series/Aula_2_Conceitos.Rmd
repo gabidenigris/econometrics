@@ -1,0 +1,268 @@
+---
+title: "Aula 2: Conceitos"
+author: "Silvio Costa"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document:
+  html_notebook: default
+format: 
+  html:
+    fig-width: 8
+    fig-height: 4
+    code-fold: true
+---
+
+# Plano
+
+1.  Funções Correlação(FC), Autocorrelação(FAC) e Autocorrelação Parcial (FACP)
+
+2.  Ruído branco
+
+3.  Teste de Ljung-box
+
+------------------------------------------------------------------------
+
+## (1) Funções características
+
+#### Covariância vs. Correlação
+
+Assuma a seguinte equação:
+
+$$
+y_t = \mu + \epsilon_t, \quad \epsilon_t \sim N(0, \sigma^2)
+$$
+
+A autocovariância é a covariância entre a variável $y_t$ no período $t$ e a mesma variável em períodos do passado. Seja $\gamma_{j}$ a autocovariância da série definida por:
+
+$$
+
+\begin{eqnarray*}
+\gamma_{j} &=& E[(y_t - \mu)(y_{t-j} - \mu) ]\\
+\quad &=& E(\epsilon_t \epsilon_{t-j})\\
+\end{eqnarray*}
+
+$$
+
+Dadas as propriedades do ruído branco $\epsilon_t$, a autovariância $\gamma_{0} = \sigma^2$ e $\gamma_{j} = 0$ se $j \neq 0$.
+
+### Função Correlação (FC)
+
+A função de correlação mede a relação linear entre duas variáveis. A correlação é uma medida estatística que indica a força e a direção da relação linear entre duas variáveis. É representada pelo coeficiente de correlação $\rho$, que varia entre -1 e 1.
+
+Para duas variáveis $X$ e $Y$:
+
+$$ \rho_{XY} = \frac{Cov(X,Y)}{\sigma_X \sigma_Y} $$
+
+-   $\rho = -1$: Indica uma correlação perfeita negativa, onde uma variável aumenta enquanto a outra diminui.
+-   $\rho = +1$: Indica uma correlação perfeita positiva, onde ambas as variáveis aumentam ou diminuem juntas.
+-   $\rho = 0$: Indica ausência de correlação linear entre as variáveis.
+
+Exemplo: correlação entre os retornos do IBOVESPA e do CDI nos últimos 365 dias:
+
+```{r}
+
+library(ipeadatar)
+library(xts)
+
+# retornos: ret_IBOV, ret_CDI
+dados_ibov = ipeadata("GM366_IBVSP366") # ibovespa 
+ibovxts  = xts( dados_ibov$value, order.by=dados_ibov$date )  
+
+dados_cdi = ipeadata("SGS366_CDI366") # cdi 
+cdixts  = xts( dados_cdi$value, order.by=dados_cdi$date ) 
+
+ret_IBOV_TX_BRUTA = ibovxts / lag(ibovxts)
+ret_CDI_TX_BRUTA = cdixts/100 + 1  
+
+retornos_brutos = merge(ret_IBOV_TX_BRUTA, ret_CDI_TX_BRUTA)
+# janela de tempo
+retornos_rng = window(retornos_brutos, start = Sys.Date()-365, end= Sys.Date() ) 
+
+dados_sem_NA <- na.omit(retornos_rng)  # remove datas que faltem em alguma série
+correlacao_ibov_cdi <- cor(dados_sem_NA)
+print(correlacao_ibov_cdi)
+
+```
+
+### Função Autocorrelação (FAC)
+
+A autocorrelação mede a correlação de uma série temporal consigo mesma em diferentes momentos no tempo.
+
+Para uma série $X_t$:
+
+$$\rho_k = \frac{cov(X_t, X_{t+k})}{\sigma^2} $$
+
+-   **Autocorrelação positiva**: Indica que os valores da série temporal tendem a seguir na mesma direção. Por exemplo, se um valor é alto, os valores seguintes também tendem a ser altos.
+
+-   **Autocorrelação negativa**: Indica que os valores da série temporal tendem a seguir em direções opostas. Por exemplo, se um valor é alto, os valores seguintes tendem a ser baixos.
+
+-   **Autocorrelação próxima de zero**: Indica pouca ou nenhuma correlação entre os valores da série temporal em diferentes momentos.
+
+### Função Autocorrelação Parcial (FACP)
+
+A autocorrelação parcial é uma extensão da autocorrelação que mede a correlação entre os valores de uma série temporal, eliminando a influência dos valores intermediários. Isso ajuda a identificar a relação direta em diferentes lags.
+
+Para uma série $X_t$:
+
+$$\phi_k = \frac{cov(X_t, X_{t+k}|X_{t+1},X_{t+2},\ldots,X_{t+k-1})}{\sigma^2} $$
+
+-   **PACF positiva**: Indica uma correlação direta positiva entre os valores da série temporal e o em diferentes lags, após ajustar para os valores intermediários.
+
+-   **PACF negativa**: Indica uma correlação direta negativa entre os valores da série temporal em diferentes lags, após ajustar para os valores intermediários.
+
+-   **PACF próxima de zero**: Indica pouca ou nenhuma correlação direta entre os valores da série temporal em diferentes lags, após ajustar para os valores intermediários.
+
+A PACF pode ser calculada usando regressão múltipla.
+
+$$ X_t = \beta_0 + \beta_1 X_{t-1} + \beta_2 X_{t-2} + \beta_3 X_{t-3} + \cdots + \beta_{k-1} X_{t-k-1} + \beta_{k} X_{t-k} + \epsilon_t $$
+
+onde o coeficiente do lag $X_{t-k}$ da regressão $\beta_k$ é também o valor da PACF no lag $k$.
+
+------------------------------------------------------------------------
+
+Exercício: calcular ACF e PACF para séries de tempo no R
+
+```{r}
+
+library(rbcb)
+# BANCO CENTRAL
+
+tabela_ipca = get_series(433, start_date = '2000-01-01')
+ipca_xts = xts( tabela_ipca$`433`, order.by = tabela_ipca$`date` )     # IPCA
+
+
+library(forecast)
+par(mfrow=c(1,2))
+
+# funcao acf também funciona, mas Acf do pacote forecast tem label mais bonito
+vacf = forecast::Acf(ipca_xts, lag.max = 12, main="ACF IPCA mensal")
+
+# funcao pacf também funciona, mas Pacf do pacote forecast tem label mais bonito
+vpacf = forecast::Pacf(ipca_xts, lag.max = 12, , main="PACF IPCA mensal")
+```
+
+------------------------------------------------------------------------
+
+## (2) Ruído branco
+
+O processo estocástico $[\epsilon_t]_{t=0}^\infty$ é um ruído branco se:
+
+1.  $E(\epsilon_t) = 0, \forall t$
+
+2.  $E(\epsilon_t^2) = \sigma^2, \forall t$
+
+3.  $E(\epsilon_t, \epsilon_{t-j}) = 0, \forall j \neq 0$
+
+-   Um ruído branco é simultaneamente: temporalmente homogêneo, estacionário e sem memória (sem dependência temporal).
+
+-   Importante: a terceira propriedade de autocovariância nula não significa independência.
+
+Criando um ruído branco no R a partir de uma distribuição normal:
+
+```{r}
+
+set.seed(12345) 
+
+rb = rnorm(1000)
+
+ts.plot(rb, lwd=2, xlab="tempo", col="blue", main="Ruído branco") 
+
+abline(h=0)
+```
+
+```{r}
+
+rb2 = rnorm(1000, mean=0, sd=0.05) 
+
+ts.plot(rb2,main="Ruído branco com média 0 e desvio-padrão 0.05", xlab = "tempo", ylab="ruido(tempo)", col="blue", lwd=2, type = "h") 
+
+abline(h=c(0,-0.05,0.05), lwd = 2, lty=c("solid","dotted","dotted"), col=c("black","red","red"))
+```
+
+Exercício: calcular as funções ACF e PACF para o ruído branco:
+
+```{r}
+par(mfrow=c(1,2))
+
+vacf = acf(rb, lag.max = 12, main="ACF")
+
+vpacf = pacf(rb, lag.max = 12, , main="PACF")
+```
+
+### Passeio aleatório
+
+Se acumularmos o ruído branco ao longo do tempo tempo, temos uma série especial chamada passeio aleatório.
+
+Seja ${y_t}_{t=1}^T$ uma série dada por $y_t = y_{t-1} + \epsilon_t$, onde $\epsilon_t \sim RB(0,\sigma^2)$.
+
+-   Em passeio aleatório, o valor da série no instante $t$ é o valor da série no instante anterior mais um erro de média zero, com variância constante.
+
+-   Recursivamente o passeio aleatório pode ser escrito como:
+
+$$
+y_t = y_0 + \sum_{j=1}^t \epsilon_j
+$$
+
+-   O valor esperado, ou seja, a média $y_t$ de em qualquer instante é igual ao valor $y_0$ (constante).
+
+-   A variância é dada por $var(y_t) = E(\sum_{j=1}^t \epsilon_j)^2 = t .\sigma^2$ e aumenta com o tempo. Portanto, a série $y_t$ não é estacionária.
+
+-   Tirando a primeira diferença do passeio aleatório, a série se torna um ruído branco, que é estacionário.
+
+-   Uma das características importantes do passeio aleatório é a persistência dos choques aleatórios (100%), isto é, o efeito de cada termo de erro não se “dissipa” ao longo do tempo. Logo, o passeio aleatório tem memória infinita, pois “guarda” a informação de todos os choques sofridos até o período corrente.
+
+```{r}
+
+x_0 = 100
+
+x_rw = x_0 + ts(cumsum(rb)) # random walk
+
+ts.plot(x_rw, lwd=2, xlab="tempo", col="blue", main="Passeio aleatório") 
+
+abline(h=0)
+```
+
+```{r}
+par(mfrow=c(1,2))
+
+vacf = acf(x_rw, lag.max = 12, main="ACF")
+
+vpacf = pacf(x_rw, lag.max = 12, , main="PACF")
+```
+
+------------------------------------------------------------------------
+
+## (3) Teste de Ljung-Box
+
+Utilizado para verificar se as autocorrelações são conjuntamente identificadas e nulas.
+
+Seja a hipótse nula:
+
+$$
+H_0 : \rho_1 = \rho_2 = \ldots = \rho_j = 0
+$$
+
+$$
+H_A: \exists \rho_m \neq 0, \textrm{para algum } m = 1,2...j
+$$
+
+Estatística do teste:
+
+$$
+Q = T (T+2) \sum_{j=1}^n \frac{\rho_j^2}{T-j}   \xrightarrow{d} \chi^2_n
+$$
+
+onde $\xrightarrow{d}$ significa convergência em distribuição para uma qui-quadrada com n graus de liberdade.
+
+Exemplo:
+
+```{r}
+# Realizando o teste de Ljung-Box no ruído branco
+teste_lb_rb <- Box.test(rb, lag = 10, type = "Ljung-Box")
+print(teste_lb_rb)
+
+# Realizando o teste de Ljung-Box no passeio aleatório
+teste_lb_rw<- Box.test(x_rw, lag = 10, type = "Ljung-Box")
+print(teste_lb_rw)
+```

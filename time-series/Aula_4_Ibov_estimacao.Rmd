@@ -1,0 +1,167 @@
+---
+title: "Ibov_estimacao"
+output: html_document
+---
+
+# Estimação do IBOV
+
+1)  Extrair os dados
+
+```{r}
+library(ipeadatar)
+library(zoo)
+
+ibov = ipeadata("GM366_IBVSP366") # ibovespa
+ibovs  = zoo( ibov$value, order.by=ibov$date )
+
+# ibov_rng = window(ibovs, start = as.Date('2024-1-1'), end= as.Date('2025-8-18'))
+
+plot(ibovs, xlab="Dia", ylab="índice", main = "Ibovespa diário", col="navy", lwd=2)
+```
+
+2)  Mensalizar a série para remover o ruído da série diária
+
+```{r}
+
+serie_mensal_ibov = aggregate(ibovs, as.yearmon, mean)
+
+plot(serie_mensal_ibov, xlab="Mês", ylab="indice", main = "Ibovespa média mensal", col="blue", lwd=2)
+```
+
+3)  Calcular retornos em log
+
+```{r}
+
+ret_mensal_ibov = diff(log(serie_mensal_ibov))*100
+
+
+ret_mensal_ibov <- window(
+  ret_mensal_ibov,
+  start = c(2018, 1),
+  end   = c(2025, 12)
+)
+
+
+plot(ret_mensal_ibov, xlab="Mês", ylab="indice", main = "Ibovespa média mensal", col="red", lwd=2)
+
+
+```
+
+4)  Estimar modelos AR(1)
+
+```{r}
+
+modelo_AR1 <- arima(ret_mensal_ibov, order = c(1, 0, 0), method = "ML", include.mean = TRUE)
+
+print(modelo_AR1)
+
+```
+
+4)  Estimar modelos AR(2)
+
+```{r}
+
+modelo_AR2 <- arima(ret_mensal_ibov, order = c(2, 0, 0), method = "ML", include.mean = TRUE)
+
+print(modelo_AR2)
+print(modelo_AR1)
+```
+
+# Metodologia Box-Jenkins
+
+1)  Investigar correlograma da série para descobrir lags significativos
+
+```{r}
+
+par(mfrow = c(1,2))
+
+acf(ret_mensal_ibov, lag.max=16, main="ACF")
+
+pacf(ret_mensal_ibov, lag.max=16, main = "PACF")
+```
+
+2)  Estimar modelos candidatos a partir da estratégia de identificação do correlograma
+
+```{r}
+
+# Definindo intervalos para os parâmetros p e q
+p_range <- 0:3
+q_range <- 0:3
+
+# Inicializando objetos para armazenar os modelos e resultados
+modelos <- list()
+resultados <- data.frame(p = integer(), d = integer(), q = integer(),
+                         AIC = double(), BIC = double(), stringsAsFactors = FALSE)
+
+# Loop para testar todas as combinações de p e q
+for (p in p_range) {
+  for (q in q_range) {
+    order_spec <- c(p, 0, q)
+    modelo_atual <- try(
+      arima(ret_mensal_ibov,
+        order = order_spec,
+        optim.control = list(maxit = 1000)),
+        silent = TRUE
+      )
+    if (!inherits(modelo_atual, "try-error")) {
+      aic_val <- AIC(modelo_atual)
+      bic_val <- BIC(modelo_atual)
+      resultados <- rbind(resultados, data.frame(p = p, d = 0, q = q, 
+                                                 AIC = aic_val, BIC = bic_val))
+      
+      nome_modelo <- paste("ARIMA(", p, ",", 0, ",", q, ")", sep = "")
+      modelos[[nome_modelo]] <- modelo_atual
+      cat(sprintf("Modelo %s: AIC = %.2f, BIC = %.2f\n", nome_modelo, aic_val, bic_val))
+    }
+  }
+}
+
+# Visualizando a tabela de resultados
+print(resultados)
+
+
+```
+
+Verificando qual o melhor modelo estimado:
+
+```{r}
+# Selecionando o melhor modelo baseado no menor AIC
+melhor_index <- which.min(resultados$AIC)
+melhor_modelo_params <- resultados[melhor_index, ]
+nome_melhor_modelo <- paste("ARIMA(", melhor_modelo_params$p, ",",
+melhor_modelo_params$d, ",", melhor_modelo_params$q, ")", sep = "")
+melhor_modelo <- modelos[[nome_melhor_modelo]]
+cat("Melhor modelo selecionado:", nome_melhor_modelo,
+"com AIC =", melhor_modelo_params$AIC, " e BIC =", melhor_modelo_params$BIC,"\n")
+## Melhor modelo selecionado: ARIMA(0,0,3) com AIC =-1606.42
+```
+
+3)  Utilizar o comando auto_arima no R:
+
+```{r}
+
+library(forecast)
+library(tseries)
+
+modelo_auto_arima = auto.arima(ret_mensal_ibov, 
+                                  ic = "bic",
+                               stationary = TRUE, seasonal = FALSE)
+
+summary(modelo_auto_arima)
+
+```
+
+4.  Gere previsões para o modelo de melhor ajuste:
+
+```{r}
+library(ggplot2)
+
+
+# Gerando previsões para os próximos 12 períodos
+previsoes <- forecast(melhor_modelo, h = 12)
+
+autoplot(previsoes,  include = 36) +
+ggtitle("Previsão do IBOVESPA com o Melhor Modelo ARIMA") +
+xlab("Tempo") +
+ylab("IBOVZ")
+```

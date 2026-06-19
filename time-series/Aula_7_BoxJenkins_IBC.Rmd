@@ -1,0 +1,245 @@
+---
+title: "Aula 7: Exercício Dirigido: Modelagem do IBC-BR com Box-Jenkins"
+author: "Silvio Costa"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+    fig_width: 8
+    fig_height: 4
+    code_folding: hide
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# Introdução & Contextualização
+
+Nesta aula, aplicaremos a metodologia Box-Jenkins para modelar a série
+temporal do IBC-BR utilizando técnicas de análise gráfica, testes
+econométricos e estimação de modelos ARIMA. Nosso enfoque inclui:
+
+-   **Compreender a Metodologia Box-Jenkins:** Explorar o ciclo de
+    identificação, estimação, diagnóstico e previsão de modelos ARIMA.
+-   **Realizar Análise Gráfica e Econométrica:** Visualizar os dados do
+    IBC-BR, identificar seus componentes (tendência, sazonalidade e
+    irregularidade) e testar sua estacionaridade.
+-   **Explorar Especificações Manuais com Grid Search:** Testar diversas
+    combinações dos parâmetros *p* (autoregressivo) e *q* (média móvel)
+    em um ambiente controlado antes de recorrer ao `auto.arima()`.
+-   **Estimar, Diagnosticar e Prever:** Selecionar o melhor modelo com
+    base em critérios informacionais (AIC/BIC), avaliar os resíduos e
+    gerar previsões futuras.
+
+------------------------------------------------------------------------
+
+# Motivação econômica
+
+-   O IBC-BR (Índice de Atividade Econômica do Banco Central) é um
+    indicador econômico criado pelo Banco Central do Brasil. Ele tem
+    como objetivo acompanhar a evolução da atividade econômica do país,
+    funcionando como uma espécie de "prévia" do PIB (Produto Interno
+    Bruto).
+
+-   Principais Características do IBC-BR:
+
+    -   Periodicidade Mensal: Diferente do PIB, que é divulgado
+        trimestralmente, o IBC-BR é calculado e divulgado mensalmente,
+        permitindo um diagnóstico mais rápido da economia
+
+    -   Componentes: O índice considera dados de diversos setores, como
+        indústria, comércio varejista, agropecuária e serviços.
+
+
+---
+
+# Análise Exploratória e Gráfica
+
+Nesta etapa, vamos carregar os dados do IBC-BR e realizar a análise gráfica da série.
+
+```{r}
+# Carregando os pacotes necessários
+library(rbcb)
+library(forecast)   # Modelos ARIMA e forecast
+library(tseries)    # Teste de raiz unitária (ADF)
+library(ggplot2)    # Visualizações
+```
+
+Carregando os dados – neste exemplo, buscamos os dados diretamente no repositório do Banco Central:
+
+```{r}
+data.ibcbr <- get_series(24364, start_date = '2003-01-01')
+IBC_BR <- ts(data.ibcbr$`24364`, start = c(2003, 1), frequency = 12)     # IBC-BR
+
+# Plot da série do IBC-BR
+autoplot(IBC_BR) +
+  ggtitle("Série do IBC-BR") +
+  xlab("Tempo") +
+  ylab("IBC-BR")
+```
+
+Podemos utilizar uma função de decomposição da série para destacar tendência, sazonalidade e componente irregular:
+
+```{r}
+
+decomp <- decompose(IBC_BR)
+autoplot(decomp) +
+  ggtitle("Decomposição da Série do IBC-BR")
+
+```
+
+---
+
+# Verificação de Estacionaridade e Diferenciação
+
+- A estacionaridade é essencial para a modelagem Box-Jenkins, que consiste na estimação (data fitting) de modelos da família ARIMA.
+- A série do IBC-BR não é estacionária, pois tem tendência (veremos depois como testar e tratar mais precisamente).
+- Por enquanto, aplicamos a primeira diferenciação e visualizamos o resultado:
+
+```{r}
+IBC_BR_diff <- diff(log(IBC_BR))
+autoplot(IBC_BR_diff) +
+  ggtitle("Série do IBC-BR após Primeira Diferenciação") +
+  xlab("Tempo") +
+  ylab(" Tx crescimento IBC-BR")
+```
+
+
+
+- Vamos agora testar se a série diferenciada é estacionária:
+
+
+```{r}
+
+# Teste de Dickey-Fuller
+adf_test <- adf.test(IBC_BR_diff)
+
+# Teste Phillips-Perron
+pp_test <- pp.test(IBC_BR_diff)
+
+# Teste KPSS
+kpss_test <- kpss.test(IBC_BR_diff)
+
+# Exibir os resultados dos testes
+print(adf_test)
+print(pp_test)
+print(kpss_test)
+
+```
+
+Qual a conclusão?
+
+---
+
+# Metodologia Box-Jenkins: Grid Search
+
+- Os softwares econométricos têm pacotes que facilitam encontrar o melhor ajuste dos dados para dezenas de combinações de modelos da família ARIMA.
+- Todavia, antes de utilizar o `auto.arima()` do R, vamos explorar como fazer isso manualmente (o resultado automático nem sempre é o melhor!!)
+
+Correlograma da série de IBC-BR com 1 diferenciação:
+
+```{r} 
+par(mfrow=c(1,2))
+
+vacf <- acf(IBC_BR_diff, lag.max = 12, main="ACF")
+vpacf <- pacf(IBC_BR_diff, lag.max = 12, main="PACF")
+```
+
+A partir da análise do correlograma da série, exploramos diferentes combinações dos parâmetros *p* e *q* (variando de 0 a 3) e compararemos os modelos com base nos critérios AIC e BIC.
+
+```{r} 
+# Definindo intervalos para os parâmetros p e q
+p_range <- 0:3
+q_range <- 0:3
+
+# Inicializando objetos para armazenar os modelos e resultados
+modelos <- list()
+resultados <- data.frame(p = integer(), d = integer(), q = integer(),
+                         AIC = double(), BIC = double(), stringsAsFactors = FALSE)
+
+# Loop para testar todas as combinações de p e q
+for (p in p_range) {
+  for (q in q_range) {
+    order_spec <- c(p, 0, q)
+    modelo_atual <- try(arima(IBC_BR_diff, order = order_spec), silent = TRUE)
+    if (!inherits(modelo_atual, "try-error")) {
+      aic_val <- AIC(modelo_atual)
+      bic_val <- BIC(modelo_atual)
+      resultados <- rbind(resultados, data.frame(p = p, d = 0, q = q, 
+                                                 AIC = aic_val, BIC = bic_val))
+      
+      nome_modelo <- paste("ARIMA(", p, ",", 0, ",", q, ")", sep = "")
+      modelos[[nome_modelo]] <- modelo_atual
+      cat(sprintf("Modelo %s: AIC = %.2f, BIC = %.2f\n", nome_modelo, aic_val, bic_val))
+    }
+  }
+}
+
+# Visualizando a tabela de resultados
+print(resultados)
+```
+
+---
+
+# Seleção e Estimação do Modelo ARIMA
+
+Selecionamos o modelo que apresentou o menor AIC a partir da busca no grid e o comparamos com o resultado automático do `auto.arima()`.
+
+```{r} 
+# Selecionando o melhor modelo baseado no menor AIC
+melhor_index <- which.min(resultados$AIC)
+melhor_modelo_params <- resultados[melhor_index, ]
+nome_melhor_modelo <- paste("ARIMA(", melhor_modelo_params$p, ",", 
+                             melhor_modelo_params$d, ",", melhor_modelo_params$q, ")", sep = "")
+melhor_modelo <- modelos[[nome_melhor_modelo]]
+cat("Melhor modelo selecionado:", nome_melhor_modelo, 
+    "com AIC =", melhor_modelo_params$AIC, "\n")
+```
+
+Comparando com o modelo sugerido pelo `auto.arima()`:
+
+```{r} 
+modelo_auto <- auto.arima(IBC_BR_diff)
+cat("Modelo sugerido pelo auto.arima():\n")
+summary(modelo_auto)
+```
+
+---
+
+# Diagnóstico dos Resíduos
+
+- Analisamos os resíduos do modelo ajustado para confirmar sua adequação.
+- Os resíduos de um modelo bem estimado devem se comportar como um ruído branco, sem evidências de autocorrelação e com distribuição aproximadamente normal:
+
+```{r} 
+checkresiduals(melhor_modelo)
+```
+
+---
+
+# Previsão e Conclusões
+
+- Agora, tendo o modelo que **melhor se ajusta aos dados**, podemos utilizá-lo para gerar previsões:
+
+```{r} 
+# Gerando previsões para os próximos 12 períodos
+previsoes <- forecast(melhor_modelo, h = 12)
+autoplot(previsoes) +
+  ggtitle("Previsão do IBC-BR com o Melhor Modelo ARIMA") +
+  xlab("Tempo") +
+  ylab("IBC-BR Previsto")
+print(previsoes)
+```
+
+---
+
+# Resumo e Discussão
+
+- **Interpretação dos Resultados do Grid Search:** Essa etapa facilita a compreensão dos impactos das diferentes combinações de *p* e *q* na qualidade do ajuste medido pelo AIC e BIC.
+- **Comparação com Métodos Automáticos:** Comparar o modelo selecionado manualmente com o `auto.arima()` pode gerar debates enriquecedores sobre as vantagens e limitações de cada método.
+- **Possibilidades e Extensões da Abordagem:**
+  - Investigação do uso de variáveis exógenas (ARIMAX).
+  - Validação cruzada da robustez dos modelos.
+  - Exploração de transformações logarítmicas e modelagem de volatilidade.
+

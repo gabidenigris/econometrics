@@ -1,0 +1,321 @@
+---
+title: 'Aula 1: Fundamentos de Séries Temporais'
+author: "Silvio Costa"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+format:
+  html:
+    fig-width: 8
+    fig-height: 4
+    code-fold: true
+always_allow_html: true
+---
+
+# Plano
+
+1.  Introdução
+2.  Classificação e Decomposição
+
+------------------------------------------------------------------------
+
+# (1) Introdução
+
+### Definições
+
+-   **O que é uma série temporal**: é uma coleção de dados ou variáveis obtidos em intervalos regulares ao longo do tempo.
+
+    -   Exemplos: podem ser intradiárias (preço de uma ação), diárias (taxa de juros Selic), mensais (inflação, desemprego, salário mínimo), trimestrais (PIB, renda disponível), anuais, etc...
+
+-   **Qual a importância da dimensal temporal?** Permite analisar e explicar as relações defasadas no tempo, aprender com momentos do passado e prever tendências econômicas e financeiras, algo essencial para tomada de boas decisões.
+
+### Objetivos de Estudar Séries Temporais
+
+1.  **Identificação de Padrões**: Detectar tendências, sazonalidades e ciclos nos dados para entender o comportamento histórico.
+
+2.  **Previsão**: Estimar valores futuros com base em dados históricos.
+
+3.  **Modelagem**: Desenvolver modelos que descrevem o comportamento dos dados, inclusive relações entre variáveis (multivariadas), permitindo simulações e decomposições.
+
+4.  **Tomada de Decisão**: Informar decisões econômicas e financeiras com base em análises robustas e previsões que façam sentido.
+
+5.  **Controle e Monitoramento**: Acompanhar e ajustar estratégias conforme mudanças nos dados, garantindo respostas rápidas diante de novas informações.
+
+------------------------------------------------------------------------
+
+### Exercício: obtendo séries temporais em APIs de bancos de dados públicos
+
+```{r include=FALSE}
+
+#install.packages("rbcb")
+
+#install.packages("fredr")
+
+#install.packages("ipeadatar")
+
+library(rbcb)
+
+library(fredr)
+
+library(ipeadatar)
+```
+
+```{r}
+
+# BANCO CENTRAL
+
+dados_ipca = get_series(433, start_date = '2000-01-01')
+ipca_ts = ts( dados_ipca$`433`, start = c( 2000, 1 ), frequency = 12 )     # IPCA
+ts.plot(ipca_ts, xlab="Meses", ylab="p.p.", main = "IPCA - taxa mensal", col="red", lwd=2)
+
+```
+
+```{r}
+
+# BANCO CENTRAL
+
+dados_pib = get_series(22099, start_date = '1995-01-01')
+pib_ts = ts( dados_pib$`22099`, start = c( 1995, 1 ), frequency = 4 )     # IPCA
+ts.plot(pib_ts, xlab="Trimestres", ylab="Índice", main = "PIB a preços de mercado (trimestral)",col="blue", lwd=3)
+
+```
+
+```{r}
+
+library(zoo)
+
+# pesquisar no site do ipeadata os códigos das séries que procura!
+
+cambio = ipeadata("GM366_ERV366") # Taxa de câmbio
+cambios  = zoo( cambio$value, order.by=cambio$date )
+
+
+plot(cambios, xlab="Dia", ylab="R$/US$", main = "Taxa de Câmbio diária", col="green")
+
+# selecione uma amostra mais recente, sem as mudanças de padrão monetário
+cambios_rng = window(cambios, start = as.Date('2000-1-1'), end= Sys.Date() )
+plot(cambios_rng, xlab="Dia", ylab="R$/US$", main = "Taxa de Câmbio diária", col="darkgreen")
+
+
+
+```
+
+```{r}
+
+library(zoo)
+
+dados_ibov = ipeadata("GM366_IBVSP366") # ibovespa
+ibov_ts  = zoo( dados_ibov$value, order.by=dados_ibov$date )
+
+ibov_rng = window(ibov_ts, start = as.Date('2024-1-1'), end= Sys.Date())
+
+plot(ibov_rng, xlab="Dia", ylab="índice", main = "Ibovespa diário", col="navy", lwd=2)
+```
+
+------------------------------------------------------------------------
+
+### Revisão de conceitos estatísticos básicos
+
+-   **Variável Aleatória**: Uma variável aleatória X pode assumir diferentes valores com certa probabilidade. Exemplo: $X \sim N(\mu,\sigma^2)$, onde $\mu$ é a média e $\sigma^2$ é a variância.
+
+-   **Vetores Aleatórios**: Um conjunto de variáveis aleatórias \$ X= (X\_{1.},X\_{2.},…,X\_{n.})\$, onde eventualmente cada $X_{i.}$ pode ter distribuições diferentes.
+
+-   **Distribuições de Probabilidade**: Funções que descrevem a probabilidade de diferentes resultados. Exemplo: Distribuição Normal $N(\mu,\sigma^2)$, Distribuição de Poisson $P(\lambda)$.
+
+-   **Máxima Verossimilhança**: método para estimar parâmetros $\Theta$ que maximizam a função de verossimilhança $L(\theta|X)$. Exemplo: Estimação de $\mu$ e $\sigma$ na distribuição normal.
+
+-   **Critérios de Informação**: utilizamos para comparar modelos diferentes e escolher aqueles que tem melhor performance
+
+    -   **Critério de Informação de Akaike (AIC)**:
+
+    $$ AIC= - 2 \log[L(\theta | X)] + 2K$$
+
+    -   **Critério de Informação Bayesiano (BIC)**:
+
+    $$ BIC= - 2 \log[L(\theta|X)] + K log(n)$$
+
+Onde:
+
+$K$ é o número de parâmetros do modelo.
+
+$n$ é o tamanho da amostra.
+
+O valor da função verossimilhança $L(\theta|X)$ é uma medida do ajuste de cada modelo aos dados.
+
+------------------------------------------------------------------------
+
+# (2) Classificação e Decomposição
+
+-   **Série Temporal**: Sequência de dados ${X_t}$ ao longo do tempo.
+
+## Classificação
+
+### Processos Determinísticos e Estocásticos
+
+-   **Processos Determinísticos**: Processos onde os valores futuros são completamente determinados pelos valores presentes e passados, sem qualquer componente aleatório.
+
+Exemplo: $X_t=a + b.t$, onde $a$ e $b$ são constantes.
+
+-   **Processos Estocásticos**: Processos onde os valores futuros dependem de valores presentes e passados, mas também incluem componentes aleatórios. Cada ponto no tempo é uma variável aleatória e a série estocástica é um conjunto de variáveis aleatórias.
+
+Exemplo: $X_t = \phi X_{t-1} + \epsilon_t$, onde $\epsilon_t$ é um termo de erro aleatório.
+
+### Processos Estacionários e Não Estacionários
+
+-   **Definição**: Um processo é estacionário se suas propriedades estatísticas, como média, variância e autocorrelação, não mudam ao longo do tempo.
+
+    Exemplo: Séries temporais de retornos de ações ajustados para volatilidade.
+
+-   Importância da estacionaridade:
+
+    -   **Estabilidade**: Processos estacionários são estáveis ao longo do tempo, enquanto processos não estacionários não são.
+
+    -   **Previsibilidade**: Processos estacionários são mais previsíveis devido à manutenção de suas propriedades estatísticas.
+
+    -   **Transformações**: Processos não estacionários frequentemente precisam ser transformados para se tornarem estacionários antes da modelagem.
+
+    -   **Aplicação de Modelos**: Modelos univariados de séries temporais, como ARMA, assumem estacionariedade, tornando processos estacionários mais fáceis de modelar diretamente.
+
+-   **Tipos de Estacionariedade**:
+
+    -   Estacionaridade Forte/Estrita: Todas as propriedades estatísticas são constantes.
+
+    $$
+        \cal{F}\Big(\{y_{ti}\}_{i=1}^k\Big) = \cal{F}\Big(\{y_{ti+h}\}_{i=1}^k\Big), \forall h
+    $$
+
+    -   Estacionaridade (Fraca): Apenas a média e covariâncias são constantes.
+
+$$
+        E[y] = \mu, \forall t \\
+        E[y^2] < \infty\\
+        E[(y_t - \mu)(y_{t-j} - \mu)] = \gamma_j
+$$
+
+![](a1_series_estacionarias.png)
+
+------------------------------------------------------------------------
+
+## Decomposição de Séries Temporais
+
+### Séries de Natureza Econômica
+
+$$ Y_t = T_t + S_t + C_t + R_t $$
+
+-   **Tendência**: Movimento geral de longo prazo, indicando crescimento ou declínio. Exemplo: Aumento contínuo do PIB ao longo dos anos.
+
+-   **Sazonalidade**: Padrões que se repetem em intervalos regulares, como mensal ou anual. Exemplo: Vendas de varejo aumentam durante o período de festas.
+
+-   **Ciclo**: Flutuações econômicas de longo prazo, como ciclos de expansão e recessão. Exemplo: Ciclos de negócios que duram vários anos.
+
+-   **Componente Aleatório**: mudanças atípicas, eventos de curta duração e sem periodicidade.
+
+-   **Características**: Padrões e comportamentos específicos das séries econômicas, como estabilidade ou volatilidade. Pode ser aditivo ou multiplicativo.
+
+```{r}
+
+# use a função decompose() para obter uma decomposição de uma série temporal (usa filtragem)
+
+decomp <-decompose(pib_ts,  type = "multiplicative")
+
+plot(decomp, col="blue" )
+
+```
+
+
+
+### Séries de Natureza Financeira
+
+-   **Heterocedasticidade Condicional**: Variabilidade que muda ao longo do tempo, frequentemente modelada por GARCH. Exemplo: Volatilidade dos retornos de ações. Exemplo:
+
+![](a1_garch.png){width="531"}
+
+-   **Fraca Dependência Linear e Não Linear**: Relações fracas entre valores passados e futuros, podendo ser capturadas por modelos ARMA ou não lineares. Exemplo: Retornos de ativos financeiros que não seguem padrões previsíveis.
+
+-   **Caudas Pesadas**: Maior probabilidade de eventos extremos, como grandes perdas ou ganhos. Exemplo: Distribuição dos retornos de ações que mostra eventos extremos mais frequentes do que a distribuição normal.
+
+![](a1_tails.jpg){width="683"}
+
+-   **Características**: Padrões e comportamentos específicos das séries financeiras, como alta volatilidade e eventos extremos.
+
+### Retornos de Ativos Financeiros
+
+-   **Retornos Simples**: Mudança percentual no valor de um ativo.
+
+Fórmula: $R_t = \dfrac{(P_t - P_{t-1})}{P_{t-1}}$, onde $P_t$ é o preço no tempo $t$ e $P_{t-1}$ é o preço no tempo anterior.
+
+-   **Retornos em Multiperíodos**: Retornos acumulados ao longo de vários períodos.
+
+Fórmula: $R_{t\rightarrow (t+k)}= \prod_{i=0}^k (1+R_{t+i}) - 1$, onde $k$ é o número de períodos.
+
+## 
+
+------------------------------------------------------------------------
+
+### Exercício: comparar os retornos do IBOVESPA e do CDI em um determinado período de tempo
+
+(1) coletar dados na API do IPEADATA
+
+```{r}
+
+library(ipeadatar)
+library(xts)
+
+# retornos: ret_IBOV, ret_CDI
+dados_ibov = ipeadata("GM366_IBVSP366") # ibovespa 
+ibov_xts  = xts( dados_ibov$value, order.by=dados_ibov$date )  
+
+dados_cdi = ipeadata("SGS366_CDI366") # cdi 
+cdi_xts  = xts( dados_cdi$value, order.by=dados_cdi$date ) 
+
+```
+
+(2) selecionar janela temporal e visualizar dados
+
+```{r}
+
+# filtro de datas
+dataini = as.Date('2025-1-1') 
+datafim = as.Date('2026-2-27')  
+
+# recortar o intervalo desejado
+ibov_win <- window(ibov_xts, start = dataini, end = datafim)
+cdi_win  <- window(cdi_xts,  start = dataini, end = datafim)
+
+plot(ibov_win, xlab="Dia", ylab="índice (pts)", main = "Ibovespa diário", 
+     col="navy", lwd=2, grid.col     = "grey95"
+) 
+
+plot(cdi_win, xlab="Dia", ylab="taxa ao dia (%)", main = "CDI diário", 
+     col="red", lwd=2, grid.col     = "grey95"
+)
+```
+
+```{r}
+
+ret_IBOV_TX_BRUTA = ibov_win / lag(ibov_win)
+ret_CDI_TX_BRUTA = cdi_win/100 + 1  
+
+ret_IBOV_ACC = cumprod(na.omit(ret_IBOV_TX_BRUTA))
+ret_CDI_ACC = cumprod(na.omit(ret_CDI_TX_BRUTA))
+
+retornos_acc = merge(ret_IBOV_ACC, ret_CDI_ACC) 
+
+# assuma um investimento de 1000 reais na data inicial, veja a evolução do retorno até hoje
+
+# use o pacote dygraph para um plot dinâmico
+
+library(dygraphs)
+
+dygraph(1000*retornos_acc, main = "Rentabilidade de R$ 1000") %>%
+  dyRangeSelector() %>%          # seletor de intervalo na parte de baixo
+  dyOptions(drawGrid = TRUE) %>% # grade no fundo
+  dyHighlight(highlightCircleSize = 5, highlightSeriesBackgroundAlpha = 0.2)
+
+```
+
+------------------------------------------------------------------------
+
+## 

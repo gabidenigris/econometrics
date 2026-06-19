@@ -1,0 +1,345 @@
+---
+title: "Aula 5: Diagnóstico dos Resíduos"
+author: "Silvio Costa"
+date: "11/abr/2025"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+format: 
+  html:
+    fig-width: 8
+    fig-height: 4
+    code-fold: true
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+## Plano
+
+-   Analisar o ajuste de um modelo aos dados
+-   Testes de Normalidade
+-   Testes de Autocorrelação serial
+-   Teste de Heteroscedasticidade Condicional
+-   Teste de erro de especificação
+
+------------------------------------------------------------------------
+
+## 1. Diagnóstico dos Resíduos
+
+-   Uma das hipóteses fundamentais dos modelos ARMA(p,q) é que o termo
+    de erro é um **ruído branco**.
+
+-   Vimos que o teste de Ljung-Box pode nos ajudar a fazer inferência
+    sobre as autocorrelações da série de resíduos. Se rejeitamos H0 no
+    teste de Ljung-Box, significa que alguma autocorrelação não é nula,
+    ou seja, há informação relevante nos resíduos (dependência temporal)
+    que pode ser melhor capturada pelo econometrista com outro modelo.
+
+-   Então, o objetivo é buscar um modelo em que o correlograma dos
+    resíduos não apresentem qualquer memória e que não descartemos a
+    hipótese nula do teste de Ljung-Box.
+
+-   Na prática, olhamos as funções FAC e FACP para tentar descobrir qual
+    autocorrelação deveria ser melhor modelada. Fazemos isso desde o
+    começo, olhando o correlograma da série e dos resíduos dos modelos
+    testados.
+
+------------------------------------------------------------------------
+
+## 2. Teste de Normalidade
+
+-   A intuição é verificar se os resíduos podem ser considerados como
+    normalmente distribuídos.
+
+-   A inspeção visual da distribuição dos resíduos quanto à sua média e
+    simetria será um elemento importante.
+
+-   Nota: Dependendo da amostra, valores extremos (outliers) podem
+    dificultar muito que o histograma dos dados se comporte como o
+    histograma de uma distribuição normal.
+
+-   Para evitar o erro de supervalorizar eventos extremos, usamos uma
+    função suavizadora (Kernel) para o histograma dos resíduos.
+
+-   Função Kernel
+
+$$
+\hat{f}_h = \frac{\sum_{t=1}^T K\Big(\frac{\epsilon - \hat{\epsilon}_t}{h}\Big)} {Th}
+$$
+
+onde $h$ é a largura da janela de suavização; $K(.)$ é a função Kernel,
+tipicamente usamos uma FDP simétria com média zero; e
+$\hat{\epsilon}_t^s = \frac{\hat{\epsilon_t} - \bar{\hat{\epsilon_t}}}{\hat{\delta}}$
+é o resíduo padronizado.
+
+-   A ponderação serve para suavizar os pontos observados, colocando
+    menos peso nos erros mais distantes.
+
+-   Ver exemplos de função Kernel em Bueno, página 81.
+
+```{r}
+
+install.packages("ipeadatar")
+install.packages("xts")
+
+library(ipeadatar)
+
+library(xts)
+
+ibov = ipeadata("GM366_IBVSP366") # ibovespa
+
+dados.ibovespa  = xts( ibov$value, order.by=ibov$date )
+
+dados.ret_ibovespa = log(dados.ibovespa/lag(dados.ibovespa)) * 100
+dados.ret_ibovespa <- na.omit(dados.ret_ibovespa)
+dados.ret_ibovespa <- as.ts(dados.ret_ibovespa)
+
+
+# Estimar a densidade kernel
+densidade <- density(dados.ret_ibovespa, kernel = "gaussian")
+
+# Plotar a densidade kernel
+plot(densidade, main = "Estimativa de Densidade Kernel", xlim=c(-10, 10), col = "black", lwd=2)
+
+hist(dados.ret_ibovespa, freq = FALSE, add = TRUE, breaks = 50, col = "lightblue")
+
+sigma_emp = sd(dados.ret_ibovespa)
+lines(density(rnorm(10000,0, sigma_emp)), col = "red", lwd=2)
+
+lines(densidade, col = "black", lwd=2)
+
+```
+
+------------------------------------------------------------------------
+
+## 3. Teste de Jarque-Bera
+
+Outra forma de verificar a normalidade dos resíduos é testar se os
+momentos da série estimada são iguais aos da normal.
+
+A hipótese nula é que a (Assimetria = 0) E (Curtose=3). Mais
+formalmente:
+
+H0: $E[\epsilon^s_t]^3 = 0  \quad \wedge \quad E[\epsilon^s_t]^4 = 3$
+
+HA: $E[\epsilon^s_t]^3 \neq 0  \quad \vee\quad E[\epsilon^s_t]^4 \neq 3$
+
+A estatística do teste de Jarque-Bera é dada por:
+
+$$
+JB = \frac{T}{6} \left( \frac{\sum_{t=1}^T (\varepsilon^s_t)^3}{T} \right) + \frac{T}{24}\left(\frac{\sum_{t=1}^T (\varepsilon^s_t)^4 - 3}{T} \right) \sim \chi^2(2)
+$$ O teste de hipótese é: se rejeitar H0 significa não normalidade dos
+resíduos. Lembre-se de que não rejeitar H0 não significa normalidade!
+
+Vamos realizar o teste de Jarque-Bera nos retornos do Ibovespa. O que
+isso significa?
+
+```{r}
+
+install.packages("moments")
+
+library(moments)
+
+# Calculando os momentos
+mean_x <- mean(dados.ret_ibovespa)      # Primeiro momento: média
+var_x <- var(dados.ret_ibovespa)        # Segundo momento: variância
+skew_x <- skewness(dados.ret_ibovespa)  # Terceiro momento: assimetria
+kurt_x <- kurtosis(dados.ret_ibovespa)  # Quarto momento: curtose
+
+# Criando a tabela com os momentos
+momentos <- data.frame(
+  Momento = c("Média", "Variância", "Assimetria", "Curtose"),
+ Valor = c(mean_x, var_x, skew_x, kurt_x)
+)
+
+# Exibindo a tabela
+print(momentos)
+
+```
+
+```{r}
+
+install.packages("tseries")
+
+library(tseries)
+
+# Realizando o teste de Jarque-Bera
+jb_test <- jarque.bera.test(dados.ret_ibovespa)
+
+# Exibindo os resultados
+print(jb_test)
+
+```
+
+Teste de normalidade de Shapiro-Wilk
+
+```{r}
+
+
+# Realizando o teste de Shapiro-Wilk
+sw_test <- shapiro.test(dados.ret_ibovespa[1:5000])
+
+# Exibindo os resultados
+print(sw_test)
+
+```
+
+------------------------------------------------------------------------
+
+## 4. Teste LM
+
+-   O teste LM para autocorrelação dos resíduos também é conhecido como
+    teste de Breucsh-Godfrey.
+
+-   Suponha a regressão de termos defasados dos resíduos:
+
+$$
+\hat{\varepsilon_t} = \beta_1 \hat{\varepsilon_{t-1}} + \beta_2 \hat{\varepsilon_{t-2}} + \ldots + \beta_h \hat{\varepsilon_{t-h}} + u_t
+$$
+
+-   Se os resíduos forem autocorrelacionados, os betas estimados devem
+    ser diferentes de zero. A hipótese nula é que todos os betas são
+    iguais a zero, ou seja, não há autocorrelação.
+
+-   A estatística do teste é $LM_h = T * R^2 \sim \chi^2(h)$
+
+```{r}
+# Instalando e carregando a biblioteca 'lmtest'
+#install.packages("lmtest")
+
+#install.packages("forecast")
+
+library(lmtest)
+
+library(forecast)
+
+
+# meu modelo
+modelo_ar1 <- arima(dados.ret_ibovespa, order= c(1,0,0))
+
+residuos <- residuals(modelo_ar1)
+
+
+# Ajuste um modelo linear com os resíduos defasados
+mod_resid_lm <- lm(residuos ~ ., data = residuos)
+# summary(mod_resid_lm)
+
+# Realizando o teste de Breusch-Godfrey para autocorrelação de ordem até 12
+bg_test <- bgtest(mod_resid_lm, order = 12, type = "Chisq")
+# summary(bg_test)
+
+# Exibindo os resultados
+print(bg_test)
+
+
+```
+
+------------------------------------------------------------------------
+
+## 5. Teste ARCH-LM
+
+-   O teste ARCH-LM serve para identificar sinais de
+    heteroscedasticidade condicional nos resíduos.
+
+-   Esse tipo de heterocedasticidade ocorre quando a variância dos erros
+    de um modelo depende dos valores passados dos erros, ou seja, há uma
+    autocorrelação na variância dos erros.
+
+-   Para implementar o teste, usamos os resíduos estimados do modelo.
+
+-   Fazemos uma regressão auxiliar dos dos resíduos ao quadrado sobre os
+    valores defasados dos resíduos ao quadrado. A equação da regressão
+    auxiliar é assim:
+
+$$
+  \epsilon_t^2 = \alpha_0 + \alpha_1 \epsilon_{t-1}^2 + \alpha_2 \epsilon_{t-2}^2 + \cdots + \alpha_q \epsilon_{t-q}^2 + u_t
+$$
+
+-   Se houver correlação entre a variância ao longo do tempo, os
+    coeficientes $\alpha$ estimados serão diferentes de zero.
+
+-   A hipótese nula do teste é que todos os coeficientes $\alpha$'s são
+    idênticos e nulos.
+
+-   A estatística LM é calculada a partir da regressão auxiliar:
+
+$$
+LM = T \cdot R^2
+$$
+
+sendo $T$ é o número de observações e $R^2$ é o coeficiente de
+determinação da regressão auxiliar.
+
+-   Se o valor p do teste ARCH-LM for menor que o nível de significância
+    escolhido (por exemplo, 0.05), rejeita-se a hipótese nula de
+    homocedasticidade e conclui-se que há evidência de
+    heterocedasticidade condicional nos resíduos do modelo.
+
+```{r}
+# Regressão auxiliar
+modelo_aux <- lm(I(residuos^2) ~ lag(I(residuos^2), 1) + lag(I(residuos^2), 2) + lag(I(residuos^2), 3))
+resultado_arch_lm <- bgtest(modelo_aux, order = 3)
+
+# Resultado do teste
+print(resultado_arch_lm)
+```
+
+------------------------------------------------------------------------
+
+## 6. Teste RESET
+
+-   O teste RESET (*Regression Equation Specification Error Test*) foi
+    proposto por Ramsey em 1969 e é utilizado para verificar se há erros
+    de especificação na forma funcional de um modelo de regressão.
+
+-   Testa a presença de não linearidades na série. Lembre-se que estamos
+    tentando explicar a série com combinações lineares de componentes AR
+    e MA.
+
+-   A intuição é que se os resíduos do modelo forem independentes, não
+    devem ser correlacionados com nenhuma outra variável, principalmente
+    os regressores defasados que já estão no modelo.
+
+-   Seja o modelo proposto $y_t = x_t'\beta + \varepsilon_t$. Estimamos
+    os coeficientes do modelo $\hat{\beta}$ e coletamos os resíduos
+    estimados $\hat{\varepsilon_t}$. Em seguida, fazemos uma regressão
+    auxiliar dos resíduos estimados contra os valores previstos de
+    $\hat{y_t} = x_t'\beta$ e componentes adicionais que são potências
+    de $\hat{y_t}$. Ou seja:
+
+$$
+ \hat{\varepsilon_t} = x_t'\beta + \psi_2 \hat{y_t}^2 + \psi_3 \hat{y_t}^3 + \ldots + \psi_h \hat{y_t}^h + v_t
+$$
+
+-   A hipótese nula \textbf{H0}: o modelo original está corretamente
+    especificado e os coeficientes das funções não-lineares
+    $\psi_2 = \psi_3 = \ldots = \psi_h = 0$ são nulos. Não há informação
+    adicional nos elementos não lineares de $\hat{y_t}$. A hipótese
+    alternativa é que modelo original está mal especificado (algum
+    coeficiente das funções não-lineares não é igual a zero).
+
+-   A estatística do teste segue uma distribuição F para verificar a
+    significância dos coeficientes das funções não-lineares. Se a
+    estatística F for significativa, há evidências de que o modelo
+    original está mal especificado.
+
+$$
+RESET_h = \frac{\frac{SSR_1 - SSR_0}{h-1}}{\frac{SSR_0}{T-K}} \sim F(h-1, T-K)
+$$
+
+-   Na prática, testamos $h$ igual a 2 ou 3 como suficientes para
+    detectar potenciais não-linearidades.
+
+```{r}
+
+library(lmtest)
+
+
+# Realize o teste RESET
+reset_test <- resettest(mod_resid_lm, power = 2:3, type="fitted")
+print(reset_test)
+```
+
+------------------------------------------------------------------------

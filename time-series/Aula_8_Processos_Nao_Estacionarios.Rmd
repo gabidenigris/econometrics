@@ -1,0 +1,565 @@
+---
+title: "Aula 8: Processos Não-Estacionários"
+author: "Silvio Costa"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+format: 
+  html:
+    fig-width: 8
+    fig-height: 4
+    code-fold: true
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+------------------------------------------------------------------------
+
+# Processos Não-Estacionários
+
+### Motivação
+
+-   Até o momento, focamos em séries de retornos que tendem a ser
+    estacionárias.
+
+-   Porém, em alguns estudos temos interesse na avaliação de outras
+    séries temporais (taxa de juros, câmbio, inflação, crescimento
+    econômico, ...).
+
+-   Quando a série temporal não é estacionária, não se pode estimá-la
+    trivialmente.
+
+-   O procedimento básico é diferenciar a série, tantas vezes quantas
+    sejam necessárias para estacionarizá-las.
+
+-   De modo geral, temos:
+    $$y_t = \text{tendência} + \text{componente estacionário} + \text{ruído}$$
+
+-   Exemplos de processos não-estacionários importantes que vamos
+    explorar:
+
+```{r}
+
+# Carregar pacotes necessários
+library(ggplot2)
+library(gridExtra)
+
+# Definir parâmetros
+set.seed(12345)
+n <- 200
+t <- 1:n
+
+# Gerar séries temporais
+random_walk <- 100 + cumsum(rnorm(n))
+random_walk_drift <- 100 + cumsum(rnorm(n) + 0.5)
+trend_stationary <- 100 + 0.05 * t + rnorm(n)
+random_walk_noise <- 100 + cumsum(rnorm(n)) + rnorm(n)
+
+# Criar gráficos
+p1 <- ggplot(data.frame(t, random_walk), aes(x = t, y = random_walk)) +
+  geom_line() + ggtitle("Passeio Aleatório")
+
+p2 <- ggplot(data.frame(t, random_walk_drift), aes(x = t, y = random_walk_drift)) +
+  geom_line() + ggtitle("Passeio Aleatório com Drift")
+
+p3 <- ggplot(data.frame(t, trend_stationary), aes(x = t, y = trend_stationary)) +
+  geom_line() + ggtitle("Tendência Estacionária")
+
+p4 <- ggplot(data.frame(t, random_walk_noise), aes(x = t, y = random_walk_noise)) +
+  geom_line() + ggtitle("Passeio Aleatório com Ruído")
+
+# Plotar gráficos em um layout 2x2
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+
+```
+
+### Séries Integradas
+
+-   Suponha o seguinte modelo: $$y_t = y_{t-1} + \delta + \epsilon_t$$
+
+-   É equivalente a um AR(1) com o coeficiente $\phi=1$. Já vimos que
+    esse coeficiente implica que o processo não tem variância definida
+    (falha da condição de estabilidade)
+
+-   Entretanto, ao diferenciar a série
+    $$\Delta y_t = \delta + \epsilon_t$$ é fácil ver que a série se
+    torna estacionária.
+
+-   Define-se $y_t$ como uma série temporal de tendência estocástica.
+    Séries temporais cujo componente de tendência é estocástico são
+    chamadas séries integradas.
+
+### Tendência Estocástica 1: Passeio Aleatório
+
+-   Séries integradas são denotadas por $I(d)$, e quando o termo de erro
+    $\epsilon_t$ é estacionário são chamadas séries ARIMA($p,d,q$).
+
+-   No caso de $I(1)$ e $\delta = 0$, o modelo fica:
+    $$y_t = y_{t-1} + \epsilon_t$$
+
+-   O modelo pode ser reescrito de forma recursiva como:
+    $$y_t = y_0 + \sum_{i=1}^{t} \epsilon_i$$
+
+-   A previsão condicional é dada simplesmente pela observação atual. O
+    que isso significa?
+    $$ E_t(y_{t+h}) = y_t + \sum_{h=1}^{H} E_t(\epsilon_{t+h}) = y_t $$
+
+-   Já as covariâncias e correlações dependem do tempo:
+
+$$
+    \textrm{Var}(y_t) = \textrm{Var}\left(\sum_{i=1}^{t} \epsilon_i\right) = t\sigma^2
+$$
+
+$$
+    \textrm{Cov}(y_t, y_{t-j}) =  E\left( \sum_{i=1}^{t} \epsilon_i \sum_{s=1}^{t-j} \epsilon_s \right) = (t - j) \sigma^2\\
+$$
+
+$$
+    \rho_j = \frac{(t - j)\sigma^2}{\sqrt{t\sigma^2} \sqrt{(t - j)\sigma^2}} = \sqrt{\frac{1 - j}{t}}
+$$
+
+-   Importante: vimos em aulas anteriores que quando o processo não é
+    estacionário, como no caso do passeio aleatório, as autocorrelações
+    são elevadas e demoram a cair.
+
+### Tendência Estocástica 2: Passeio Aleatório com Drift
+
+-   No caso de $I(1)$ e $\delta = 1$:
+    $$y_t = y_{t-1} + \delta + \epsilon_t$$
+
+-   O processo pode ser reescrito de forma recursiva como:
+    $$y_t = y_0 + \delta t + \sum_{i=1}^{t} \epsilon_i$$
+
+-   Veja que agora $y_t$ depende tanto de um componente determinístico
+    $\delta t$ quanto de um estocástico.
+
+-   A previsão condicional é dada por:
+    $$ E_t(y_{t+h}) = y_t + \delta H + \sum_{h=1}^{H} E_t(\epsilon_{t+h}) = y_t + \delta H $$
+
+### Tendência Estocástica 3: Passeio Aleatório com Ruído
+
+-   Partimos do Passeio Aleatório puro (sem drift, $\delta = 0$):
+    $$y_t = y_{t-1} + \epsilon_t$$
+
+-   Adicionamos $\eta_t$, um ruído branco:
+    $$y_t = y_0 + \sum_{i=1}^{t} \epsilon_i + \eta_t$$
+
+-   Podemos diferenciar o processo:
+    $$\Delta y_t = \epsilon_t + \Delta \eta_t$$
+
+-   Este modelo $I(1)$ possui uma correlação menor do que o Passeio
+    Aleatório puro (compare):
+
+$$
+\text{Var}(y_t) = \text{Var}\left(\sum_{i=1}^{t} \epsilon_i + \eta_t\right) = t\sigma^2 + \sigma^2_{\eta}\\
+$$
+
+$$
+\text{Cov}(y_t, y_{t-j}) = E\left(\sum_{i=1}^{t} \epsilon_i + \eta_t \sum_{s=1}^{t-j} \epsilon_s + \eta_{t-j}\right) = (t - j)\sigma^2\\
+$$
+
+$$
+\rho_j = \frac{(t - j)\sigma^2}{\sqrt{t\sigma^2 + \sigma^2_{\eta}} \sqrt{(t - j)\sigma^2 + \sigma^2_{\eta}}} < \sqrt{\frac{1 - j}{t}}
+$$
+
+### Tendência Estocástica 4: Determinística + Estacionária
+
+-   Suponha o seguinte modelo:
+    $$y_t = y_0 + \delta t + \psi(L) \epsilon_t$$
+
+-   Repare que há uma parte da equação que depende do tempo, defina
+    $$f(t) = y_0 + \delta t$$ como a tendência determinística da série
+
+-   $\psi(L)$ é um polinômio no operador de defasagem que captura a
+    estrutura do processo estocástico, indicando que os choques podem
+    ter um efeito dinâmico ao longo do tempo.
+
+-   O produto $\psi(L) \epsilon_t$ indica uma estrutura autorregressiva
+    e/ou de médias móveis.
+
+-   Ao diferenciar a série, a série diferenciada tem uma constante
+    $\delta$ (tendência) e uma parte estocástica modificada por
+    $(1 - L)$.
+
+$$\Delta y_t = (1 - L) y_t = \delta + (1 - L) \psi(L) \epsilon_t$$
+
+-   Importante: Nesse caso, a diferenciação de uma série com tendência
+    determinística não é a melhor opção, pois o termo de erro da série
+    diferenciada é um polinômio de defasagens.
+
+------------------------------------------------------------------------
+
+## Modelo Geral
+
+-   O modelo mais geral possível inclui tendência determinística e
+    estocástica, além de erros que seguem um processo ARMA($p,q$).
+
+-   Chamaremos este modelo de tendência geral mais componente irregular:
+    $$y_t = y_0 + \delta t + \psi(L) \eta_t + \sum_{i=1}^{t} \epsilon_i$$,
+    em que $\eta_t$ é um ruído branco.
+
+-   O Passeio Aleatório e suas variações (com Drift ou Ruído) são casos
+    particulares do modelo geral.
+
+-   Os processos que contém tendência estocástica também são chamados de
+    diferença estacionária, porque ao diferenciar a série se obtém um
+    processo estacionário (resíduos são ruído branco).
+
+-   No caso particular do processo de tendência estacionária, a
+    diferenciação também torna a série estacionária, mas os resíduos
+    divergem de um ruído branco (são um polinômio de combinações de
+    defasagens que impõem dependencia temporal)
+
+-   Dessa forma, é de extrema importância avaliar o tipo de tendência da
+    série e como iremos tratá-la.
+
+------------------------------------------------------------------------
+
+## Removendo a Tendência Determinística
+
+-   Vamos estimar uma regressão de $y_t$ contra o vetor de tempo $t$ e
+    armazenar os resíduos. Esta série de resíduos será modelada
+    separadamente.
+
+-   Etapas:
+
+1.  Estimamos a regressão:
+    $$y_t = \delta_0 + \delta_1 t + \delta_2 t^2 + ... + \delta_n t^n + \epsilon_t$$,
+    em que $e_t = \psi(L) \epsilon_t$, obtendo assim os resíduos
+    estimados $\hat{e_t}$
+2.  Estime um modelo ARMA($p,q$) a partir dos resíduos estimados.
+3.  Para determinar o número de parâmetros $n$, use os testes
+    convencionais como $t-Student$ e $F$.
+4.  Em geral, estimamos o modelo com um $n$ máximo e aplicamos os testes
+    $t$ e $F$ até o momento em que os parâmetros rejeitem a hipótese
+    nula.
+
+-   Importante: se a série temporal possui tendência determinística, é
+    necessário utilizar essa metodologia.
+
+## Teste de Raiz Unitária
+
+-   A ordem de integração $I$ de uma série temporal indica o número de
+    raízes unitárias presentes na série
+
+-   Série $I(1)$ → 1 raiz unitária, Série $I(2)$ → 2 raízes unitárias,
+    ...
+
+-   A ordem de integração está associada a um problema de estabilidade
+    dos processos estocásticos, por exemplo no caso de um AR(1) em que
+    $\phi = 1$.
+
+-   Os Testes de Raiz Unitária partem dessa intuição, vamos verificar
+    $H_0 : \phi = 1$.
+
+-   Todavia, os testes vão ajudar a descobrir se a série possui
+    tendência estacionária determinística ou tendência estocástica. A
+    análise visual é um método impreciso para distinguir estas duas
+    possibilidades.
+
+-   Partimos do modelo $y_t = \phi y_{t-1} + \varepsilon_t$ em que
+    queremos testar $H_0 : \phi = 1$
+
+-   Entretanto, podemos modificar o teste da seguinte forma:
+
+$$
+y_t - y_{t-1} = \phi y_{t-1} - y_{t-1} + \varepsilon_t
+$$
+
+$$
+    \Delta y_t = (\phi - 1) y_{t-1} + \varepsilon_t\\
+    $$
+
+$$
+    \Delta y_t = \alpha y_{t-1} + \varepsilon_t
+$$
+
+-   Agora testar $H0 : \alpha = 0$ é equivalente a testar para
+    $\phi = 1$. Porém o teste para $\alpha$ é melhor porque podemos ter
+    uma resposta ainda mais precisa se, após a diferenciação da série,
+    ainda há uma segunda raiz unitária.
+
+-   O problema é que, sob a hipótese nula, esse teste não possui uma
+    distribuição convencional como a de t-student. Simulações de Monte
+    Carlo mostram que a distribuição estatística não é simétrica.
+
+-   Dessa forma, usar a estatística $t$ para inferir sobre $\alpha$
+    aumentará a chance de erros do tipo I (rejeitar $H_0$ e assumir
+    estacionaridade quando, na verdade, há raiz unitária).
+
+### Dickey e Fuller
+
+-   Dickey e Fuller (1979) resolvem essa questão ao recalcular a
+    estatística $t$ para estes casos.
+
+-   Primeiro, eles consideraram diferentes estatísticas dependendo se o
+    processo possuía drift e/ou tendência determinística. Ou seja:
+
+$$
+\Delta y_t =  \alpha y_{t-1} + \epsilon_t   \rightarrow  \tau \\  
+$$
+
+$$
+\Delta y_t = \mu + \alpha y_{t-1} + \epsilon_t  \rightarrow  \tau_{\mu}\\
+$$
+
+$$
+\Delta y_t = \mu + \delta t + \alpha y_{t-1} + \epsilon_t  \rightarrow \tau_{\tau}
+$$
+
+-   O principal mérito de Dickey e Fuller (1979) foi estimar repetidas
+    simulações de Monte Carlo de amostras que variavam de $T = 25$ até
+    $\infty$ observações para cada uma dessas equações. A partir dessas
+    simulações foram mapeados os $\tau$ críticos que são usados nos
+    testes de hipóteses.
+
+-   Importante: Na especificação mais completa, a significância do
+    parâmetro $\delta$ nos diz se há ou não tendência determinística.
+
+-   Usando os $\tau$ críticos mapeados por Dickey e Fuller (1979), o
+    teste de hipóteses segue os passos habituais. Com
+    $H_0 : \alpha = 0$, a estatística é dada por:
+
+$$
+\hat{\tau} = \frac{\hat{\alpha}}{s(\hat{\alpha})}
+$$
+
+onde o valor do coeficiente $\hat{\alpha}$ estimado é:
+
+$$\hat{\alpha} = \frac{\sum_{t=1}^{T} y_{t-1} y_t}{\sum_{t=1}^{T} y_{t-1}^2} - 1$$
+$S^2$ é a variância amostral dada por:
+
+$$S^2 = \frac{1}{T - 1} \sum_{t=1}^{T} (\Delta y_t - \hat{\alpha} y_{t-1})^2$$
+
+e o desvio-padrão do coeficiente $s(\hat{\alpha})$ é dado por:
+
+$$s(\hat{\alpha}) = \frac{S}{\sqrt{\sum_{t=1}^{T} y_{t-1}^2}}$$.
+
+-   Rejeitamos a hipótese nula se $\hat{\tau} < \tau_{Dickey-Fuller}$,
+    usando enfim os valores críticos das simulações de Monte Carlo.
+
+-   Rejeitar a hipótese nula → Não há Raiz Unitária e vale a hipótese
+    alternativa: o processo é estacionário.
+
+------------------------------------------------------------------------
+
+### Dickey-Fuller Aumentado
+
+-   O teste de Dickey e Fuller (1979) parte da premissa de que o erro é
+    ruído branco.
+
+-   Na prática, frequentemente o erro é um processo estacionário
+    qualquer.
+
+-   Suponha $y_t$ um processo AR:
+    $$y_t = \mu + \phi_1 y_{t-1} + ... + \phi_{p-1}y_{t-p+1} + \phi_p y_{t-p} + \varepsilon_t$$
+
+-   Usando um pouco de álgebra e diferenciando a expressão, obtemos:
+    $$\Delta y_t = \mu + \alpha y_{t-1} + \sum_{i=1}^{p-1} \lambda_i \Delta y_{t-i} + \varepsilon_t$$
+    $$    \alpha = -\left(1 - \sum_{i=1}^{p} \phi_i\right)\qquad\lambda_i = -\sum_{j=i}^{p-1} \phi_{j+1}$$
+
+-   Essa correção permite usar os $t$ críticos do teste padrão de
+    Dickey-Fuller.
+
+-   Nota: mesmo que $y_t$ siga um processo mais complexo com a inclusão
+    de termos de médias móveis, Said e Dickey (1984) mostram que modelos
+    ARIMA(m,1,n) são bem aproximados por um ARIMA(p,1,0).
+
+-   Neste contexto, $p$ é o número de defasagens do AR necessárias para
+    que os resíduos sejam ruído branco.
+
+------------------------------------------------------------------------
+
+### Teste de Dickey-Fuller no R
+
+```{r}
+
+
+# Carregar pacotes necessários
+library(rbcb)
+library(tseries)
+
+# Exemplo de série temporal de PIB (substitua com seus dados reais)
+data.pib = get_series(22109, start_date = '1995-01-01')
+PIB = ts( data.pib$`22109`, start = c( 1995, 1 ), frequency = 4 )     # PIB
+
+# Realizar o teste de Dickey-Fuller
+adf_test <- adf.test(PIB)
+
+# Exibir os resultados do teste
+print(adf_test)
+
+
+```
+
+```{r}
+
+# Realizar o teste de Dickey-Fuller no PIB em LOG???
+adf_test <- adf.test(log(PIB))
+
+# Exibir os resultados do teste
+print(adf_test)
+```
+
+```{r}
+# Realizar o teste de Dickey-Fuller na taxa de crescimento do PIB:
+adf_test <- adf.test(log(PIB/lag(PIB)))
+
+# Exibir os resultados do teste
+print(adf_test)
+
+```
+
+------------------------------------------------------------------------
+
+### **Philips-Perron**
+
+-   Philips e Perron (1988) apresentam um teste consistente mesmo nos
+    casos em que haja variáveis defasadas no tempo e correlação serial
+    nos erros.
+
+-   A intuição é verificar a presença de raiz unitária independente das
+    ordens p e q de um ARIMA(p,1,q). Isso elimina a necessidade de se
+    especificar um modelo AR para expurgar a correlação serial dos
+    resíduos.
+
+-   Processo de estimação bastante semelhante ao de Dickey-Fuller.
+
+-   Considere o sistema de equações:
+
+$$
+    \Delta y_t = \alpha y_{t-1} + u_t  \rightarrow   z_t\\
+    $$ $$
+    \Delta y_t = \mu + \alpha y_{t-1} + u_t  \rightarrow  z_{t,\mu} \\
+$$
+
+$$
+    \Delta y_t = \mu + \delta t + \alpha y_{t-1} + u_t  \rightarrow  z_{t,\tau}
+$$
+
+-   Etapas:
+
+1.  Estimar as médias amostrais: $$
+    \bar{y} = \frac{\sum_{t=1}^{T} y_t}{T} \qquad \bar{y}_{-1} = \frac{\sum_{t=1}^{T} y_{t-1}}{T}
+    $$
+
+2.  Estimar o parâmetro do componente AR: $$
+    \hat{\alpha} = \frac{\sum_{t=1}^{T}(y_{t-1} - \bar{y}_{-1})(y_t - \bar{y})}{\sum_{t=1}^{T}(y_{t-1} - \bar{y}_{-1})^2} - 1
+    $$
+
+3.  Estimar a constante ou "drift": $$
+    \hat{\mu} = \bar{y} - (\hat{\alpha} + 1)\bar{y}_{-1}
+    $$
+
+4.  Estimar a variância:
+    $$\hat{\sigma}^2 = \frac{\sum_{t=1}^{T} \hat{\mu}^2_t}{T} = \frac{\sum_{t=1}^{T}\left( \Delta y_t - \hat{\mu} - \hat{\alpha} y_{t-1}\right)^2}{T}$$
+
+5.  Estimar o desvio-padrão do parâmetro do componente AR:
+    $$s(\hat{\alpha}) = \frac{\hat{\sigma}}{\sqrt{\sum_{t=1}^{T} y^2_{t-1}}}$$
+
+6.  Calcular a estatística de Dickey e Fuller:
+    $$\hat{\tau}_{\mu} = \frac{\hat{\alpha}}{s(\hat{\alpha})}$$
+
+7.  Estimar a variância de longo prazo HAC (Heteroscedasticity and
+    Autocorrelation Consistent). É uma medida estatística utilizada para
+    ajustar a variância estimada de uma série temporal, levando em
+    consideração a presença de heteroscedasticidade e autocorrelação nos
+    erros: $$
+    \hat{v}^2 = \hat{\sigma}^2 + \frac{2}{T} \sum_{j=1}^{M} \omega \left(\frac{j}{M + 1}\right) \sum_{t=j+1}^{T} \hat{\mu}_t \hat{\mu}_{t-j}
+    $$
+
+8.  Por fim, calcular a estatística de Philips-Perron:
+
+$$
+    \hat{z}_{t,\mu} = \hat{\tau}_{\mu} \left(\frac{\hat{\sigma}}{\hat{v}}\right) - \frac{1}{2} \left(\frac{\hat{v}^2 - \hat{\sigma}^2}{\hat{v} \sqrt{T^{-2} \sum_{t=1}^{T} y^2_{t-1}}}\right)
+    $$
+
+-   Nota: o teste de Philips-Perron é problemático quando $\alpha$ é
+    muito próximo de zero. Nesse caso, o poder do teste é baixo, ou
+    seja, tem dificuldade de rejeitar a nula quando ela é falsa.
+
+```{r}
+
+# Teste Phillips-Perron
+pp_test <- pp.test(log(PIB))
+
+# Veja os resultados
+print(pp_test)
+
+```
+
+```{r}
+
+
+# Teste Phillips-Perron
+pp_test <- pp.test(log(PIB/lag(PIB)))
+
+# Veja os resultados
+print(pp_test)
+
+```
+
+------------------------------------------------------------------------
+
+### **KPSS**
+
+-   Teste criado por Kwiatkowski, Philips, Schmidt e Shin(1992) para
+    lidar com o baixo poder dos testes tradicionais Dickey-Fuller e
+    Philips-Perron.
+
+$$
+H_0: y_t \sim I(0) \\
+H_1: y_t \sim I(1)
+$$
+
+-   Considere o sistema de equações:
+
+$$
+y_t = x_t + u_t\\
+$$
+
+$$
+    x_t = x_{t-1} + \delta_t + v_t\\
+$$
+
+$$
+    \delta_t = \delta_{t-1} + \zeta_t\\
+$$
+
+em que $\zeta_t$ é ruído branco.
+
+
+-   Objetivo do teste: verificar a variância do passeio aleatório $x_t$.
+
+$$
+    H_0: \sigma^2_v = 0\\
+    H_1: \sigma^2_v > 0
+    $$
+
+-   Não rejeitar H0 → Processo Estacionário.
+
+-   Isso traz uma evidência adicional de que a série não possui raiz
+    unitária.
+
+```{r}
+# Teste KPSS
+kpss_test <- kpss.test(log(PIB))
+
+# Veja os resultados
+print(kpss_test)
+
+
+```
+
+```{r}
+# Teste KPSS
+kpss_test <- kpss.test(log(PIB/lag(PIB)))
+
+# Veja os resultados
+print(kpss_test)
+```
+
+------------------------------------------------------------------------

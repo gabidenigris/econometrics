@@ -1,0 +1,483 @@
+---
+title: "Aula 11: Modelos VAR: Funções de Resposta ao Impulso"
+author: "Silvio Costa"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document:
+  html_notebook: default
+format: 
+  html:
+    fig-width: 8
+    fig-height: 4
+    code-fold: true
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+------------------------------------------------------------------------
+
+# Causalidade de Granger
+
+-   Como saber se uma variável é capaz de prever outra? Se sim, em quais
+    condições?
+
+-   **Granger-causalidade**: indica se movimentos na variável $y$
+    antecedem os movimentos da variável $z$.
+
+-   Por que isso é útil?
+
+-   **Nota**: Jamais confundir com efeito causal de uma política ou
+    intervenção!
+
+-   O teste de Granger é bem simples: um teste F conjunto para os
+    coeficientes de interesse, assumindo SEMPRE que eles multipliquem
+    variáveis estacionárias:
+
+$$
+z_t = \phi_{20} + \sum_{i=1}^{p} \phi_{i,21} y_{t-i} + \sum_{i=1}^{p} \phi_{i,22} z_{t-i} + e_{2t}
+$$
+
+$$
+\begin{cases}
+H_0 : \phi_{1,21} = \phi_{2,21} = \ldots = \phi_{p,21} = 0 \\
+H_1 : \phi_{i,21} \neq 0, \, i = 1, 2, \ldots, p
+\end{cases}
+$$
+
+-   A estatística de teste é dada por: $$
+    S_1 = \frac{(e_r^2 - e_u^2) / p}{e_u^2 / (T - 2p - 1)} \sim F(p, T - 2p - 1)
+    $$ em que $r$ representa o modelo restrito e $u$ representa o modelo
+    nao-restrito. Se $S_1$ for maior do que o nível de significância,
+    rejeita-se a nula de que $y$ não Granger-causa $z$.
+
+-   Causalidade de Granger não é o mesmo que teste de exogeneidade.
+    Granger mede precedência temporal. Exogeneirade requer que as
+    variáveis não sejam afetadas contemporaneamente e um modelo VAR em
+    forma reduzida não permite testar isso.
+
+-   Exemplo de teste de causalidade de Granger no R:
+
+```{r}
+
+
+library(rbcb)
+library(tseries)    
+
+
+ipca_table = get_series(433, start_date = '2000-01-01')
+ipcats = ts( ipca_table$`433`, start = c( 2000, 1 ), frequency = 12 )     # IPCA
+
+selic_table <- get_series(4189, start_date = '2000-01-01')
+selicts <- ts(selic_table$`4189`, start = c(2000, 1), frequency = 12)     # Selic
+
+
+```
+
+```{r}
+library(lmtest)
+
+dbvar <- ts.intersect(ipcats, selicts)
+
+# Executar o teste de causalidade de Granger
+result1 <- grangertest(ipcats ~ selicts, order = 10, data = dbvar)
+
+result2 <- grangertest(selicts ~ ipcats, order = 10, data = dbvar)
+
+# Visualizar os resultados
+print(result1)
+
+print(result2)
+
+```
+
+------------------------------------------------------------------------
+
+## VAR Estrutural
+
+-   A Decomposição de Cholesky permite supor parâmetros estruturais do
+    VAR a partir da diagonalização da matriz de covariância dos
+    resíduos.
+
+-   Entretanto, nem sempre teremos um número suficiente de restrições
+    para montar esta matriz diagonal!
+
+-   Por exemplo, nem sempre podemos assumir efeito nulo das relações
+    econômicas que buscamos estimar.
+
+-   Vamos agora introduzir um modelo mais genérico, que permite testar
+    diferentes restrições. Partindo de um VAR(1) com as seguintes
+    equações:
+
+$$
+AX_t = B_0 + B_1X_{t-1} + B\varepsilon_t
+$$
+
+Quando se estima a forma reduzida, obtêm-se os resíduos $\hat{e}_t$ tal
+que:
+
+$$
+B\hat{\varepsilon}_t = A\hat{e}_t
+$$
+
+-   O problema é restringir o sistema de forma a recuperar $\epsilon_t$
+    segundo a hipótese de que cada resíduo da forma estrutural é
+    independente.
+
+-   Para começar, usa-se a matriz de covariância dos erros de forma
+    reduzida:
+
+$$
+\Sigma = \begin{pmatrix}
+\sigma_{11} & \sigma_{12} & \ldots & \sigma_{1n} \\
+\vdots & \vdots & \ddots & \vdots \\
+\sigma_{n1} & \sigma_{n2} & \ldots & \sigma_{nn}
+\end{pmatrix}
+$$
+
+-   Em que cada elemento é estimado por:
+
+$$
+\hat{\sigma}_{ij} = \frac{1}{T} \sum_{t=1}^{T} \hat{e}_{it} \hat{e}_{jt}
+$$
+
+-   Após calcular a matriz de variância-covariância dos resíduos,
+    podemos usar o seguinte resultado para recuperar os parâmetros
+    estruturais:
+
+$$
+BB' = \text{Var}(A e_t) = A \text{Var}(e_t) A'
+$$
+
+-   A matriz de covariância dos choques estruturais BB' tem n variâncias
+    desconhecidas. Assumido que a matriz A tem diagonal unitária
+    (normalização), a matriz A tem $(n^2 - n)$ elementos desconhecidos.
+    Então são $n^2$ elementos desconhecidos.
+
+-   Conhecemos a matriz $\Sigma = Var(e_t)$ que tem $\frac{n(n+1)}{2}$
+    elementos conhecidos.
+
+-   Logo, são necessárias $\frac{n(n+1)}{2}$ restrições para
+    identificação exata do modelo estrutural!
+
+-   Exemplo 6.13 (BUENO): Monte o sistema de equações e imponha a
+    restrição de Cholesky para resolvê-lo:
+
+$$
+\begin{pmatrix}
+\sigma^2_{\epsilon_1} & 0 \\
+0 & \sigma^2_{\epsilon_2}
+\end{pmatrix}
+=
+\begin{pmatrix}
+1 & a_{12} \\
+a_{21} & 1
+\end{pmatrix}
+\begin{pmatrix}
+0.5 & 0.4 \\
+0.4 & 0.6
+\end{pmatrix}
+\begin{pmatrix}
+1 & a_{21} \\
+a_{12} & 1
+\end{pmatrix}
+$$
+
+------------------------------------------------------------------------
+
+## Exemplo no R: identificando modelos VAR:
+
+passo 1: montando a base de dados
+
+```{r}
+
+library(rbcb)
+library(tseries)    
+
+
+ipca_table = get_series(433, start_date = '2000-01-01')
+ipcats = ts( ipca_table$`433`, start = c( 2000, 1 ), frequency = 12 )     # IPCA
+
+ibc_table <- get_series(24364, start_date = '2003-01-01')
+idxibcts <- ts(ibc_table$`24364`, start = c(2003, 1), frequency = 12)     # IBC-BR
+ibcts <- 100*diff(log(idxibcts))
+
+selic_table <- get_series(4189, start_date = '2000-01-01')
+selicts <- ts(selic_table$`4189`, start = c(2000, 1), frequency = 12)     # Selic
+
+
+dbvar <- ts.intersect(ibcts, ipcats, selicts)
+dbvar <- ts(dbvar, start = start(dbvar), frequency = 12)
+
+
+```
+
+Passo 2: selecionando a ordem do VAR:
+
+```{r}
+
+library(vars)
+
+# Selecionando a ordem do modelo VAR
+var_order <- VARselect(dbvar, lag.max = 12, type = "const")
+print(var_order)
+
+```
+
+Passo 3: estimando o VAR
+
+```{r}
+
+ordem = 3;
+
+# Estimando o modelo VAR
+var_model <- VAR(dbvar, p = ordem, type = "const")
+summary(var_model)
+```
+
+Passo 4: identificação do VAR (os resíduos do VAR são $\hat{e_t}$)
+
+$$
+A\hat{e}_t = B \hat{\varepsilon}_t
+$$
+
+-   Por Cholesky (depende da ordem das variáveis):
+
+```{r}
+
+library(svars)
+
+svar_chol <- id.chol(var_model)
+
+svar_chol
+
+# Alternativa usando função SVAR:
+
+b_chol <- svar_chol$B
+diag(b_chol) <- NA
+b_chol[2,1] <- NA
+b_chol[3,1:2] <- NA  
+
+svar_chol2 <- SVAR(var_model, Amat = NULL, Bmat = b_chol, estmethod = "scoring")
+
+svar_chol2
+
+```
+
+-   Por restrições de curto prazo
+
+```{r}
+
+A_mat <- NULL
+
+B_mat <- matrix(NA, 3, 3)
+diag(B_mat) <- 1
+
+B_mat[1,2] <- 0 # Exemplo: (2:IPCA não afeta  1:ATIVIDADE contemporaneamente)
+B_mat[1,3] <- 0 # Exemplo: (3:SELIC não afeta 1:ATIVIDADE contemporaneamente)
+B_mat[2,3] <- 0 # Exemplo: (3:SELIC não afeta 2:IPCA contemporaneamente)
+
+svar_ab <- SVAR(var_model, Amat = A_mat, Bmat = B_mat, estmethod = "scoring")
+
+svar_ab
+
+
+```
+
+Compare as IRFs dos dois modelos com estratégias diferentes de
+identificação:
+
+```{r}
+
+# IRFs para ambos os modelos
+irf_chol <- irf(svar_chol2, impulse = NULL, response = NULL, n.ahead = 24, boot = TRUE, ortho = TRUE)
+plot(irf_chol)
+
+```
+
+```{r}
+
+irf_ab <- irf(svar_ab, impulse = NULL, response = NULL, n.ahead = 24, boot = TRUE, ortho = TRUE)
+plot(irf_ab)
+
+```
+
+```{r}
+
+
+# Função para plotar IRFs comparando os dois modelos
+plot_irf_comparison <- function(svar1, svar2, legend, n.ahead = 24) {
+  vars <- colnames(svar1$var$y)
+  par(mfrow = c(length(vars), length(vars)), mar = c(3, 3, 2, 1))
+  for (impulse in vars) {
+    for (response in vars) {
+      irf1 <- irf(svar1, impulse = impulse, response = response, n.ahead = n.ahead, boot = FALSE, ortho = TRUE)
+      irf2 <- irf(svar2, impulse = impulse, response = response, n.ahead = n.ahead, boot = FALSE, ortho = TRUE)
+      plot(irf1$irf[[1]], type = "l", col = "blue", ylim = range(c(irf1$irf[[1]], irf2$irf[[1]])),
+           main = paste(impulse, "→", response), ylab = "", xlab = "")
+      lines(irf2$irf[[1]], col = "red", lty = 2)
+      abline(h = 0, col = "gray")
+    }
+  }
+  legend("topright", legend = legend, col = c("blue", "red"), lty = c(1, 2), bty = "n")
+}
+
+# Gerar os gráficos
+plot_irf_comparison(svar_chol2, svar_ab, c("Cholesky", "SVAR_Bmat"), n.ahead = 12)
+
+
+```
+
+------------------------------------------------------------------------
+
+## O problema da identificação dos modelos SVAR
+
+-   VAR tem uma especificação flexível para capturar a dinâmica dos
+    dados. Todavia, os resíduos não permitem analisar os efeitos de cada
+    equação/choque.
+
+-   Não conseguimos identificar/mapear todos os parâmetros de um modelo
+    estrutural sem impor restrições adicionais.
+
+-   Diversas abordagens/estratégias têm sido desenvolvidas e são
+    bastante utilizadas para análise multivariada e identificação de
+    choques estruturais.
+
+    1.  Restrições de curto prazo por meio da identificação recursiva
+        (decomposição de Cholesky) (Sims 1980; Blanchard 1989;
+        Christiano, Eichenbaum & Evans 1999; Bjørnland 2009)
+
+    2.  Restrições de curto prazo com ajuda da literatura (teoria +
+        evidência empírica)
+
+    3.  Restrições de longo prazo (Blanchard and Quah 1989; Gali 1999)
+
+    4.  Restrições de sinais (Uhlig 2005)
+
+    5.  Instrumentos externos
+
+    6.  Combinar restrições de sinais com instrumentos externos
+
+    7.  Narrativas
+
+------------------------------------------------------------------------
+
+## Blanchard & Quah (1989)
+
+Seja $X_t$ um vetor $n  \times 1$ com $n$ variáveis endógenas, tal que:
+
+$$
+A X_t = B_0 + \sum_{i=1}^{p} B_i X_{t-i} + B \varepsilon_t
+$$
+
+onde:
+
+-   $A$ é uma matriz $n \times n$ de restrições contemporâneas,\
+-   $B_0$ é um vetor $n \times 1$ de constantes,\
+-   $B_i$ é a matriz $n \times n$ da $i$-ésima defasagem,\
+-   $\varepsilon_t \sim i.i.d.(0, I_n)$ é um vetor $n \times 1$ de
+    termos de erro,
+
+O modelo VAR equivalente em forma reduzida tem ordem $p$ (Bueno, 2012):
+
+$$
+X_t = \Phi_0 + \sum_{i=1}^{p} \Phi_i X_{t-i} + \epsilon_t
+$$
+
+Se os autovalores do polinômio $I - \sum_{i=1}^{p} \Phi_i L^i$ estiverem
+fora do círculo unitário, podemos utilizar a **decomposição de Wold** e
+reescrever o modelo como um VMA($\infty$):
+
+$$
+X_t = \mu + \sum_{j=0}^{\infty} \Phi_1^{j} \epsilon_{t-j}
+$$
+
+Definindo $C_j = \Phi_1^{j} B$, temos:
+
+$$
+X_t = \mu + \sum_{j=0}^{\infty} C_j \varepsilon_{t-j}
+$$
+
+Agora vamos desenvolver essa equação matricial para o caso em que
+$n = 2$:
+
+$$
+\begin{bmatrix}
+y_t \\
+z_t
+\end{bmatrix}
+=
+\begin{bmatrix}
+\mu_y \\
+\mu_z
+\end{bmatrix}
++
+\sum_{j=0}^{\infty}
+\begin{bmatrix}
+c_{11,j} & c_{12,j} \\
+c_{21,j} & c_{22,j}
+\end{bmatrix}
+\begin{bmatrix}
+\varepsilon_{y,t-j} \\
+\varepsilon_{z,t-j}
+\end{bmatrix}
+$$
+
+A derivada parcial de $y_t$ em relação a $\varepsilon_{y,t}$ é:
+
+$$
+\frac{\partial y_t}{\partial \varepsilon_{y,t}} = c_{11,0}
+$$
+
+Para que os choques em $y_t$ não tenham efeito de longo prazo, é
+necessário impor:
+
+$$
+\sum_{j=0}^{\infty} c_{11,j} = 0
+$$
+
+-   **Blanchard & Quah (1989): o que gera flutuações na taxa de
+    crescimento do PIB (**$\Delta y_t$) e na taxa de desemprego ($U_t$)?
+
+    -   Dois tipos de choques:
+
+        -   choques com efeitos permenantes no produto
+
+        -   choques com efeitos transitórios
+
+    -   Blanchard & Quah interpretam os choques com efeitos permanentes
+        no produto como choques de oferta ($\varepsilon_t^{supply}$) e
+        os choques com efeitos transitórios no produto como choques de
+        demanda ($\varepsilon_t^{demand}$). Ou seja, no longo prazo,
+        apenas os choques de oferta afetam o PIB.
+
+    -   Podemos impor essa condição de longo prazo para identificar o
+        VAR!
+
+```{r}
+
+# 4. Estimar SVAR com identificação de longo prazo (Blanchard-Quah)
+
+restricoes <- matrix(NA, 3, 3)
+restricoes[2, 1] <- 0
+restricoes[2, 3] <- 0
+
+var_model_lr <- BQ(var_model)
+
+var_model_lr
+
+
+# Gerar os gráficos
+plot_irf_comparison(var_model_lr, svar_ab, c("BQ","SVAR_Bmat"),n.ahead = 12)
+
+```
+
+-   Outros exemplos de restrições de longo prazo, derivadas da teoria
+    econômica, que podem ser utilizadas para identificar o VAR:
+
+    -   Neutralidade da moeda
+    -   Curva de Phillips vertical (choques de preços não afetam a taxa
+        de desemprego no longo prazo)
+    -   Efeito Fisher (choques de preços não afetam a taxa de juros
+        real)

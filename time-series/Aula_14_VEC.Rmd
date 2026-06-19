@@ -1,0 +1,513 @@
+---
+title: "Aula 14: Modelos VEC"
+author: "Silvio Costa"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document:
+  html_notebook: default
+format: 
+  html:
+    fig-width: 8
+    fig-height: 4
+    code-fold: true
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+## Introdução ao VECM
+
+-   Quando há cointegração, o modelo VAR original pode ser reescrito na
+    forma de correção de erros, conhecido como VECM (Vector Error
+    Correction Model).
+
+-   Vamos tomar como base a seguinte relação de cointegração:
+
+$$
+u_t = 
+\begin{pmatrix}
+y_t - z_t
+\end{pmatrix}
+\begin{pmatrix}
+1 \\\\
+\beta
+\end{pmatrix}
+$$
+
+-   Para transformar um modelo VAR em um modelo VEC, precisamos
+    reescrever o modelo VAR de forma a obter o vetor $u_t$ estacionário
+    que representa a relação de longo prazo entre as variáveis.
+
+-   Para o caso bivariado $X_t = [y_t, z_t]'$, a introdução do vetor
+    $u_t$ pode ser visualizada no modelo em diferenças como:
+
+$$
+\Delta y_t = \alpha_1 \hat{u}_{t-1} + \sum_{j=1}^{p-1} \lambda_{11,j+1} \Delta y_{t-j} + \sum_{j=1}^{p-1} \lambda_{12,j+1} \Delta z_{t-j} + e_{yt}
+$$
+
+$$
+\Delta z_t = \alpha_2 \hat{u}_{t-1} + \sum_{j=1}^{p-1} \lambda_{21,j+1} \Delta y_{t-j} + \sum_{j=1}^{p-1} \lambda_{22,j+1} \Delta z_{t-j} + e_{zt}
+$$
+
+-   **Importante**: não incluir o vetor $\hat{u}_t$ nesse caso é
+    equivalente a omitir uma variável explicativa, o que pode resultar
+    em estimativas viesadas.
+
+-   O modelo VEC é uma versão mais completa e robusta do VAR.
+
+### Derivação do modelo VEC
+
+-   Note que um modelo VAR em nível pode ser reescrito utilizando
+    operadores de defasagem:
+
+$$
+X_t = \Phi_1 X_{t-1} + \Phi_2 X_{t-2} + \dots + \Phi_p X_{t-p} + e_t
+$$
+
+$$
+[I - (\Phi_1 L + \Phi_2 L^2 + \dots + \Phi_p L^p)] X_t = e_t
+$$
+
+$$
+\Phi(L) X_t = e_t
+$$
+
+-   $\Phi(L)$ é uma forma funcional apenas para tornar a expressão mais
+    compacta.
+
+-   Agora seja o caso particular com $L = 1$:
+
+$$
+\Phi(1) = [I - (\Phi_1 + \Phi_2 + \dots + \Phi_p)] := -\Phi
+$$
+
+------------------------------------------------------------------------
+
+## Exemplo: derivação do VECM a partir de um VAR(2)
+
+-   Vamos derivar o modelo VECM partindo de um VAR(2):
+
+$$
+X_t = \Phi_1 X_{t-1} + \Phi_2 X_{t-2} + e_t
+$$
+
+-   Subtraindo e somando $\Phi_2 X_{t-1}$:
+
+$$
+X_t = \Phi_1 X_{t-1} + \Phi_2 X_{t-1} - \Phi_2 X_{t-1} + \Phi_2 X_{t-2} + e_t = X_{t-1}(\Phi_1 + \Phi_2) - \Phi_2 \Delta X_{t-1} + e_t
+$$
+
+-   Subtraindo $X_{t-1}$ de ambos os lados:
+
+$$
+X_t - X_{t-1} = -X_{t-1} + X_{t-1}(\Phi_1 + \Phi_2) - \Phi_2 \Delta X_{t-1} + e_t
+$$
+
+$$
+\Delta X_t = -[I - (\Phi_1 + \Phi_2)] X_{t-1} - \Phi_2 \Delta X_{t-1} + e_t
+$$
+
+$$
+\Delta X_t = \Phi X_{t-1} - \Phi_2 \Delta X_{t-1} + e_t
+$$
+
+-   Caso haja cointegração, a primeira parte da equação representa o
+    componente de longo prazo.
+
+-   Para entendermos se o sistema está de fato **em equilíbrio**,
+    precisamos avaliar o **comportamento da matriz** $\Phi$, em especial
+    se o vetor de cointegração faz parte dela.
+
+
+------------------------------------------------------------------------
+
+## Exemplo: derivação do VECM a partir de um VAR(0)
+
+-   Neste caso particular, a derivação é ainda mais simples:
+
+$$
+y_t = \pi x_t + e_t
+$$
+
+-   Subtraindo $y_{t-1}$ de ambos os lados:
+
+$$
+y_t - y_{t-1} = \pi x_t - y_{t-1} + e_t
+$$
+
+$$
+\Delta y_t = \pi x_t - \pi x_{t-1} + \pi x_{t-1} - y_{t-1} + e_t
+$$
+
+$$
+\Delta y_t = \pi \Delta x_t - (y_{t-1} - \pi x_{t-1}) + e_t
+$$
+
+$$
+\Delta y_t = \pi \Delta x_t - 
+\begin{pmatrix}
+y_{t-1} & x_{t-1}
+\end{pmatrix}
+\begin{pmatrix}
+1 \\\\
+-\pi
+\end{pmatrix}
++ e_t
+$$
+
+-   Na prática, este modelo é estimado em duas etapas:
+
+    1.  Estime os resíduos $\hat{u}_t = y_t - \hat{\beta}_1 x_t$;
+
+    2.  Inclua os resíduos na regressão em diferença:
+
+$$
+\Delta y_t = \pi \Delta x_t + \alpha \hat{u}_{t-1} + e_t
+$$
+
+Em que $\hat{u}_{t-1}$ pode ser expresso pelo produto das matrizes
+$X_{t-1} \beta'$.
+
+------------------------------------------------------------------------
+
+## Teste de Cointegração de Johansen
+
+-   Intuição: Perceba a semelhança entre o teste de Johansen e o teste
+    de raiz unitária Dickey-Fuller Aumentado (ADF).
+
+-   Partindo-se do VAR(p) com **k** variáveis, obtém-se o VAR
+    reparametrizado representado por: $$
+      \Delta Y_t = \Pi Y_{t-1} + \sum_{i=1}^{p-1} \Gamma_i \Delta Y_{t-i} +
+    \varepsilon_t
+      $$
+
+-   O **determinante de uma matriz** é igual ao **produto dos
+    autovalores**!!
+
+-   Os pacotes econométricos calculam os autovalores e os ordenam em
+    ordem decrescente.
+
+-   O posto $r$ da matriz $n \times n$ pode ser interpretado da seguinte
+    forma:
+
+$$
+\begin{cases}
+r < n & \text{há cointegração} \\
+r = 0 & \text{não há cointegração, variáveis são não estacionárias} \\
+r = n & \text{variáveis endógenas são todas estacionárias}
+\end{cases}
+$$
+
+-   Lembrando que o **posto da matriz** é o **número de raízes
+    diferentes de zero**.
+
+-   Se não há cointegração, todos os autovalores estarão próximos de
+    zero.
+
+-   O teste de Johansen fornece três possibilidades com base no posto da
+    matriz $\Pi$:
+
+    1.  $\text{Posto}(\Pi) = 0$
+
+        Isso implica que $\Pi = 0$, o que é análogo ao caso em que
+        $\phi = 0$ no teste ADF. Temos $k$ raízes unitárias. Se não há
+        cointegração, todos os autovalores estarão próximos de zero.
+
+        **Interpretação**: não há relação de cointegração entre as
+        variáveis e não existe mecanismo de correção de erro.
+
+        **Decisão**: o modelo VAR deve ser especificado em primeiras
+        diferenças.
+
+    2.  $\text{Posto}(\Pi) = k$
+
+        As linhas de $\Pi$ são linearmente independentes e
+        $|\Pi| \neq 0$. Existem $k$ combinações estacionárias das
+        variáveis, mas a cointegração não é pertinente, pois as
+        variáveis já são estacionárias.
+
+        **Decisão**: o modelo VAR deve ser estimado em nível.
+
+    3.  $0 \leq \text{Posto}(\Pi) = r \leq k$
+
+        Existem $r$ combinações lineares estacionárias e $|\Pi| = 0$,
+        com pelo menos uma linha ou coluna nula. Se as variáveis são
+        $I(1)$, então existem $r$ relações de cointegração que fornecem
+        $r$ vetores de cointegração. O termo $\Pi Y_{t-1}$ fornece as
+        combinações lineares estacionárias.
+
+        **Decisão**: o modelo VEC (VECM) deve ser utilizado.
+
+-   O procedimento de Johansen consiste em testar o número de raízes
+    características diferentes de zero na matriz $\Pi$, o que
+    corresponde ao número de relações e vetores de cointegração entre as
+    variáveis.
+
+-   São utilizados dois testes:
+
+#### Teste do Traço
+
+-   Este teste considera como hipótese nula a existência de $r_0$ raízes
+    características diferentes de zero (ou seja, $r_0$ vetores de
+    cointegração), contra a alternativa de que $r > r_0$. Formalmente:
+
+$$
+H_0: r = r_0 \quad \text{vs.} \quad H_1: r > r_0
+$$
+
+-   O teste analisa a **estatística do traço**, que, no caso de
+    autovalores próximos de zero, apresenta valores muito pequenos. A
+    estatística de teste é dada por:
+
+$$
+\lambda_{\text{traço}} = -T \sum_{i=r_0+1}^{k} \ln(1 - \hat{\lambda}_i)
+$$
+
+Onde: - $T$ é o número de observações; - $\hat{\lambda}_i$ são as raízes
+características obtidas da matriz $\Pi$ estimada.
+
+#### Teste da Raiz Característica Máxima
+
+-   Este teste considera como hipótese nula a existência de $r_0$ raízes
+    características diferentes de zero, contra a alternativa de que
+    $r = r_0 + 1$. Formalmente:
+
+$$
+H_0: r = r_0 \quad \text{vs.} \quad H_1: r = r_0 + 1
+$$
+
+-   A estatística de teste é:
+
+$$
+\lambda_{\text{máx}} = -T \ln(1 - \hat{\lambda}_{r_0+1})
+$$
+
+-   Os testes são realizados em sequência, de forma crescente, até que a
+    hipótese nula não seja rejeitada.
+
+-   Para $H_0: r = 0$, rejeitar $H_0$ significa que há um ou mais
+    vetores de cointegração (pelo teste do traço) e exatamente um (pelo
+    teste da raiz máxima).
+
+-   Para $H_0: r = 1$, rejeitar $H_0$ indica que há dois ou mais vetores
+    de cointegração (traço) e mais um (máxima).
+
+
+------------------------------------------------------------------------
+
+## **Teorema de Granger**
+
+É possível decompor $\Phi$ em duas matrizes multiplicativas quando
+$\Phi$ tem posto menor que $n$ (presença de raiz unitária torna o
+determinante nulo). Pelo teorema de Granger, se $|\Phi| = 0$, podemos
+escrever:
+
+$$
+\Phi = \alpha \beta'
+$$
+
+em que $\beta$ é o vetor de cointegração.
+
+Logo, o modelo VECM pode ser escrito como:
+
+$$
+\Delta X_t = (\alpha \beta') X_{t-1} - \Phi_2\Delta X_{t-1} + e_t
+$$
+
+
+
+------------------------------------------------------------------------
+
+## Exemplo no R: teste de Johansen e modelo VEC
+
+1.  Obtendo dados no Google Finance. O pacote quantmod permite baixar
+    dados financeiros.
+
+```{r}
+library(tseries)
+library(quantmod)
+
+# Baixar dados de preços ajustados
+getSymbols(c("^SPX", "^IXIC", "^DJI"), src = "yahoo", from = "2001-01-01") 
+
+# Selecionar preços ajustados
+spx <- Ad(SPX)
+nasdaq <- Ad(IXIC)
+dji <- Ad(DJI)
+
+# Combinar em um único objeto
+data <- na.omit(merge(nasdaq, spx, dji))
+colnames(data) <- c("QQQ", "SPX", "DJI")
+
+datam <- aggregate(data, as.yearmon, mean)
+
+```
+
+```{r}
+
+
+# Normalizar para 100
+norm_prices <- sweep(datam, 2, data[1, ], FUN = "/") * 100
+
+# Plotar
+matplot(index(norm_prices), coredata(norm_prices), type = "l", lty = 1, lwd = 2,
+  col = rainbow(ncol(norm_prices)), xlab = "Data", ylab = "Preço Normalizado",
+  main = "Séries Normalizadas (Base 100)")
+legend("topleft", legend = colnames(norm_prices), col = rainbow(ncol(norm_prices)), lty = 1, lwd = 2)
+
+
+```
+
+2.  Testes de raiz unitária. Primeiro, testamos se as séries são
+    integradas de ordem 1 (I(1)) com o teste de Dickey-Fuller aumentado
+    (ADF):
+
+```{r}
+
+adf.test(log(datam$QQQ))        # Deve ser não estacionária
+
+adf.test(log(datam$SPX))        # Deve ser não estacionária
+
+adf.test(log(datam$DJI))        # Deve ser não estacionária
+
+
+```
+
+3.  Teste de Cointegração de Johansen
+
+```{r}
+library(urca)
+
+mydba <- merge(datam$QQQ, datam$SPX, datam$DJI) #
+
+# Transformar para log
+log_mydba <- log(mydba)
+
+
+# Teste de Johansen
+johansen_test1 <- ca.jo(log_mydba, type = "trace", spec = "longrun", ecdet = "trend", K = 2)
+summary(johansen_test1)
+
+johansen_test2 <- ca.jo(log_mydba, type = "eigen", spec = "longrun",  ecdet = "trend", K = 2)
+summary(johansen_test2)
+
+```
+
+4.  Estimar o VECM
+
+```{r}
+
+vecm <- cajorls(johansen_test1, r = 1 )
+
+# Vetor de cointegração
+vecm$beta
+
+# Vetor de correção de erro
+vecm$rlm
+
+```
+
+------------------------------------------------------------------------
+
+#### Exercício: Represente esses resultados na forma matricial do VECM.
+
+Escreva as matrizes:
+
+$$
+\Delta X_t = (\alpha \beta') X_{t-1} - \Gamma_1  \Delta X_{t-1} + e_t
+$$ onde $\alpha$ é a velocidade de ajuste do vetor de correção de erros
+e $\beta$ é um vetor de cointegração.
+
+##### Equação de Cointegração com Tendência
+
+$$
+\text{ECT}_t = \text{QQQ}_{t} -0.491633705 \cdot \text{SPX}_{t} -0.663627794 \cdot \text{DJI}_{t} -0.002137011 \cdot t
+$$
+
+##### Equações do Vetor de Correção de Erro (VECM)
+
+$$
+\Delta \text{QQQ}_t = -0.05468 \cdot \text{ECT}_{t-1} -0.10995 + 0.25709 \cdot \Delta \text{QQQ}_{t-1} + 0.38500 \cdot \Delta \text{SPX}_{t-1} -0.46333 \cdot \Delta \text{DJI}_{t-1}
+$$ $$
+\Delta \text{SPX}_t = 0.02772 \cdot \text{ECT}_{t-1} +  0.06324 + 0.06776 \cdot \Delta \text{QQQ}_{t-1} + 0.39232 \cdot \Delta \text{SPX}_{t-1} -0.30374 \cdot \Delta \text{DJI}_{t-1}
+$$ $$
+\Delta \text{DJI}_t = 0.05136 \cdot \text{ECT}_{t-1} + 0.11304 + 0.10281 \cdot \Delta \text{QQQ}_{t-1} + 0.03957  \cdot \Delta \text{SPX}_{t-1} -0.02349  \cdot \Delta \text{DJI}_{t-1}
+$$
+
+5.  Projetar o VECM
+
+```{r}
+
+library(vars)
+
+# Vamos representar o VECM na sua forma VAR:
+modelo_var_vecm <- vec2var( johansen_test1, r = 1  )
+
+# forecast
+forecast = predict( modelo_var_vecm, n.ahead = 12 )
+
+forecast_nivel <- lapply(forecast$fcst, function(x) {
+  x[,1:3] <- exp(x[,1:3]) # média, IC inferior e superior
+  x
+})
+
+# valores previstos
+print(forecast_nivel)
+```
+
+Graficamente:
+
+```{r}
+
+library(ggplot2)
+
+# Função para criar gráfico para cada variável
+plot_var_forecast <- function(var_name) {
+
+  # Série histórica
+  hist_series <- tail(datam[, var_name],36)
+  
+  # Índice para projeção
+  start_forecast <- end(hist_series) + 1/12
+  forecast_index <- seq(start_forecast, by = 1/12, length.out = 12)
+  
+  
+  # Nome no forecast$fcst
+  fcst_name <- paste0("datam.", var_name)
+
+  # Valores previstos e intervalos
+  pred <- zoo(forecast_nivel[[fcst_name]][, "fcst"], forecast_index)
+  lower <- zoo(forecast_nivel[[fcst_name]][, "lower"], forecast_index)
+  upper <- zoo(forecast_nivel[[fcst_name]][, "upper"], forecast_index)
+  
+  # Adiciona o último ponto da série histórica como primeiro da previsão
+  pred <- zoo(c(coredata(tail(hist_series, 1)), coredata(pred)),c(end(hist_series), index(pred)))
+  lower <- zoo(c(coredata(tail(hist_series, 1)), coredata(lower)),c(end(hist_series), index(lower)))
+  upper <- zoo(c(coredata(tail(hist_series, 1)), coredata(upper)),c(end(hist_series), index(upper)))
+
+  
+  # Combinar tudo
+  combined <- merge(hist_series, pred, lower, upper)
+  df <- fortify.zoo(combined)
+  colnames(df) <- c("Date", "Hist", "Forecast", "Lower", "Upper")
+  
+  # Gráfico
+  ggplot(df, aes(x = Date)) +
+    geom_line(aes(y = Hist), color = "black", na.rm = TRUE) +
+    geom_line(aes(y = Forecast), color = "blue", na.rm = TRUE) +
+    geom_ribbon(aes(ymin = Lower, ymax = Upper), fill = "blue", alpha = 0.2, na.rm = TRUE) +
+    labs(title = paste("Projeção VAR/VECM para", var_name),
+         y = var_name, x = "Tempo") +
+    theme_minimal()
+}
+
+
+
+# Gerar gráficos para as 3 variáveis
+plot_var_forecast("QQQ")
+plot_var_forecast("SPX")
+plot_var_forecast("DJI")
+
+
+```
