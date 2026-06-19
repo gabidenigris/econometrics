@@ -79,17 +79,6 @@ Topics covered:
 
 ---
 
-## Tools and languages
-
-| Purpose | R | Python |
-|---|---|---|
-| Core estimation | `fixest`, `plm`, `sandwich`, `lmtest` | `statsmodels`, `linearmodels` |
-| Time series | `forecast`, `urca`, `vars`, `rugarch` | `statsmodels.tsa`, `arch` |
-| Causal / panel | `did`, `AER`, `gmm` | `linearmodels.panel`, `differences` |
-| Reporting | `modelsummary`, `ggplot2` | `pandas`, `matplotlib` |
-
-
----
 
 ## Author
 
