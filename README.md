@@ -34,10 +34,10 @@ econometrics/
 │   ├── aula2.R
 │   └── aula3.R
 └── panel-data/
-│   ├── README.md
-│   ├── aula1.R
-│   ├── aula2.R
-│   └── aula3.R
+    ├── README.md
+    ├── aula1.R
+    ├── aula2.R
+    └── aula3.R
 ```
 
 ---
