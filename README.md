@@ -34,7 +34,7 @@ econometrics/
 
 > Microeconometric methods applied to data observed at a single point in time.
 
-**Project:** [link here](#)
+**Project:** [link here](https://github.com/gabidenigris/econometrics/tree/main/cross-section)
 
 Topics covered:
 - Ordinary Least Squares (OLS) and the Gauss-Markov assumptions
