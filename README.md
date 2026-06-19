@@ -22,10 +22,22 @@ The goal is reproducibility: clone the repo, install the dependencies, and every
 
 ```
 econometrics/
-├── cross-section/      # Microeconometrics on a single time period
-├── time-series/        # Dynamics, stationarity, forecasting
-├── panel-data/         # Combining cross-sectional units over time
-└── README.md
+├── README.md
+├── cross-section/
+│   ├── README.md
+│   ├── aula1.R
+│   ├── aula2.R
+│   └── aula3.R
+├── time-series/
+│   ├── README.md
+│   ├── aula1.R
+│   ├── aula2.R
+│   └── aula3.R
+└── panel-data/
+│   ├── README.md
+│   ├── aula1.R
+│   ├── aula2.R
+│   └── aula3.R
 ```
 
 ---
@@ -87,20 +99,6 @@ Topics covered:
 | Causal / panel | `did`, `AER`, `gmm` | `linearmodels.panel`, `differences` |
 | Reporting | `modelsummary`, `ggplot2` | `pandas`, `matplotlib` |
 
----
-
-## How to use
-
-```bash
-# Clone the repository
-git clone https://github.com/USERNAME/econometrics.git
-cd econometrics
-
-# Open the module you want to study
-cd cross-section
-```
-
-Each module folder contains its own README with the specific setup steps, data sources, and a description of the scripts.
 
 ---
 
