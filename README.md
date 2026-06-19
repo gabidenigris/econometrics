@@ -4,17 +4,6 @@ A structured collection of lecture notes and reproducible code covering the thre
 
 Each module pairs the theory (identification, assumptions, estimators) with hands-on implementations in R and Python, so the same concept can be read, derived, and run end to end.
 
----
-
-## About
-
-This repository is organized as a learning and reference resource. Every module follows the same logic:
-
-1. **Theory.** Short notes on the data-generating process, identifying assumptions, and the estimator.
-2. **Code.** A clean, commented script that estimates the model on a real or simulated dataset.
-3. **Output.** Tables and figures formatted for academic use.
-
-The goal is reproducibility: clone the repo, install the dependencies, and every result should regenerate from raw data.
 
 ---
 
@@ -99,17 +88,6 @@ Topics covered:
 | Causal / panel | `did`, `AER`, `gmm` | `linearmodels.panel`, `differences` |
 | Reporting | `modelsummary`, `ggplot2` | `pandas`, `matplotlib` |
 
-
----
-
-## References
-
-A few standard texts that inform the notes across all three modules:
-
-- Wooldridge, J. *Introductory Econometrics: A Modern Approach.*
-- Wooldridge, J. *Econometric Analysis of Cross Section and Panel Data.*
-- Hamilton, J. *Time Series Analysis.*
-- Angrist, J. and Pischke, J. *Mostly Harmless Econometrics.*
 
 ---
 
