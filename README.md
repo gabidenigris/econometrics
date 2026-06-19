@@ -65,7 +65,7 @@ Topics covered:
 
 > Estimators that exploit both the cross-sectional and the time dimension.
 
-**Project:** [link here](#)
+**Project:** [link here](https://github.com/gabidenigris/econometrics/tree/main/panel-data)
 
 Topics covered:
 - Pooled OLS, Fixed Effects, and Random Effects
