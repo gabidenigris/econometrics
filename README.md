@@ -49,7 +49,7 @@ Topics covered:
 
 > Modeling and forecasting data observed sequentially over time.
 
-**Project:** [link here](https://github.com/gabidenigris/econometrics/tree/main/time-series#readme)
+**Project:** [link here](https://github.com/gabidenigris/econometrics/tree/main/time-series#readme) ✅
 
 Topics covered:
 - Stationarity, unit roots, and the ADF and KPSS tests
