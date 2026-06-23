@@ -34,7 +34,7 @@ econometrics/
 
 > Microeconometric methods applied to data observed at a single point in time.
 
-**Project:** [link here](https://github.com/gabidenigris/econometrics/tree/main/cross-section)
+**Project:** [link here](https://github.com/gabidenigris/econometrics/tree/main/cross-section) <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbnh1NmF5NjI5dG1oeWFveGhibGYwbTh5NXVwd3d5aHlzNXN2amZxeSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/17mNCcKU1mJlrbXodo/giphy.gif" width="16"/><br>
 
 Topics covered:
 - Ordinary Least Squares (OLS) and the Gauss-Markov assumptions
@@ -65,7 +65,7 @@ Topics covered:
 
 > Estimators that exploit both the cross-sectional and the time dimension.
 
-**Project:** [link here](https://github.com/gabidenigris/econometrics/tree/main/panel-data)
+**Project:** [link here](https://github.com/gabidenigris/econometrics/tree/main/panel-data) <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbnh1NmF5NjI5dG1oeWFveGhibGYwbTh5NXVwd3d5aHlzNXN2amZxeSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/17mNCcKU1mJlrbXodo/giphy.gif" width="16"/><br>
 
 Topics covered:
 - Pooled OLS, Fixed Effects, and Random Effects
