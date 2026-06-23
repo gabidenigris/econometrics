@@ -15,7 +15,7 @@ Examples pull live data from Brazilian public APIs (Banco Central via `rbcb`, IP
 
 | # | Topic | Lecture | Code |
 |---|-------|---------|------|
-| 00 | R Basics | [PDF](./Aula_0_Basico_R.pdf) | [.R](./Aula_0_Basico_R.R) |
+| 00 | R Basics | [PDF](./Aula_0_Basico_R.pdf) | [.Rmd](./Aula_0_Basico_R.R) |
 | 00 | Statistics Review | [PDF](./Aula_0_Revisao_Estatistica.pdf) | [.Rmd](./Aula_0_Revisao_Estatistica.Rmd) |
 | 01 | Fundamentals and Introduction | [PDF](./Aula_1_Fundamentos_Intro.pdf) | [.Rmd](./Aula_1_Fundamentos_Intro.Rmd) |
 | 02 | Core Concepts | [PDF](./Aula_2_Conceitos.pdf) | [.Rmd](./Aula_2_Conceitos.Rmd) |
